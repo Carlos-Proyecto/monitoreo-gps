@@ -91,6 +91,7 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         <div class="square sq-lightblue sq-3"></div>
         <div class="square sq-yellow sq-4"></div>
         <div class="square sq-darkblue sq-5"></div>
+        <div class="square sq-lightblue sq-6"></div>
     </div>
 
     <img src="/static/logo.png" alt="Logo Policlínica Metropolitana" class="logo-img" />

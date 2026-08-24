@@ -220,7 +220,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         .header-line1 { font-size: 12px; font-weight: 800; color: #ffffff; line-height: 1.1; }
         .header-line2 { font-size: 9px; font-weight: 600; color: #94a3b8; margin-top: 1px; }
         .header-line3 { font-size: 10px; font-weight: 700; color: #38bdf8; margin-top: 1px; }
-        .header-line4 { font-size: 8.5px; font-weight: 500; color: #cbd5e1; margin-top: 2px; display: inline-block; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px; }
 
         .stops-panel {
             width: 100%;
@@ -319,7 +318,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="header-line1">Policlínica Metropolitana</div>
             <div class="header-line2">Gerencia de Seguridad Integral</div>
             <div class="header-line3">Monitoreo de Transporte</div>
-            <div class="header-line4">Última act: <span id="fecha">--:--:--</span></div>
         </div>
 
         <div class="stops-panel">
@@ -602,8 +600,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                                 unitsCoords[key].lat = uData.lat;
                                 unitsCoords[key].lon = uData.lng;
                                 unitsCoords[key].speed = uData.speed;
-
-                                document.getElementById('fecha').innerText = uData.fecha;
 
                                 unitFeatures[key].getGeometry().setCoordinates(ol.proj.fromLonLat([uData.lng, uData.lat]));
                             }

@@ -106,7 +106,7 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         <form method="POST" action="/login">
             <div class="input-group">
                 <label for="emp_code">Ingrese su Código de Empleado</label>
-                <input type="text" id="emp_code" name="emp_code" placeholder="Ej: 123456" required autofocus autocomplete="off" />
+                <input type="password" id="emp_code" name="emp_code" placeholder="Ej: 123456" required autofocus autocomplete="off" />
             </div>
             <button type="submit">Ingresar</button>
         </form>

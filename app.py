@@ -78,7 +78,9 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         form { width: 100%; }
         .input-group { margin-bottom: 18px; }
         label { display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; text-align: center; }
-        input[type="text"] { width: 100%; padding: 14px; border-radius: 10px; border: 2px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 14px; text-align: center; outline: none; }
+	input[type="text"],
+	input[type="password"] { width: 100%; padding: 14px; border-radius: 10px; border: 2px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 14px; text-align: center; outline: none; }
+	input::placeholder { text-align: center; opacity: 0.7; }
         input[type="text"]:focus { border-color: #0284c7; }
         button { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #0284c7; color: #ffffff; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3); }
         .error-message { background-color: #fef2f2; border: 1px solid #fca5a5; color: #dc2626; font-size: 11px; font-weight: 600; padding: 10px; border-radius: 8px; margin-top: 15px; width: 100%; }

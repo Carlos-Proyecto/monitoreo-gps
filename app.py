@@ -653,6 +653,23 @@ def map_view(code):
 @app.route('/api/gps', methods=['GET'])
 def get_gps():
     return jsonify(gps_data)
+@app.route('/traccar', methods=['GET', 'POST'])
+def traccar_receiver():
+    lat = request.args.get('lat') or request.form.get('lat')
+    lng = request.args.get('lon') or request.args.get('lng') or request.form.get('lon') or request.form.get('lng')
+    speed = request.args.get('speed', 0)
+
+    if lat and lng:
+        try:
+            gps_data["Unidad-01"]["lat"] = float(lat)
+            gps_data["Unidad-01"]["lng"] = float(lng)
+            gps_data["Unidad-01"]["speed"] = float(speed)
+            gps_data["Unidad-01"]["fecha"] = datetime.datetime.now(tz_caracas).strftime("%H:%M:%S")
+            print(f"--> [TRACCAR RECEPTOR] U-01 actualizada: Lat {lat}, Lng {lng}")
+            return "OK", 200
+        except Exception as e:
+            return f"Error: {str(e)}", 400
+    return "Receptor GPS Traccar Activo", 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

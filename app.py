@@ -78,9 +78,7 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         form { width: 100%; }
         .input-group { margin-bottom: 18px; }
         label { display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; text-align: center; }
-	input[type="text"],
-	input[type="password"] { width: 100%; padding: 14px; border-radius: 10px; border: 2px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 14px; text-align: center; outline: none; }
-	input::placeholder { text-align: center; opacity: 0.7; }
+        input[type="text"] { width: 100%; padding: 14px; border-radius: 10px; border: 2px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 14px; text-align: center; outline: none; }
         input[type="text"]:focus { border-color: #0284c7; }
         button { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #0284c7; color: #ffffff; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3); }
         .error-message { background-color: #fef2f2; border: 1px solid #fca5a5; color: #dc2626; font-size: 11px; font-weight: 600; padding: 10px; border-radius: 8px; margin-top: 15px; width: 100%; }
@@ -93,7 +91,6 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         <div class="square sq-lightblue sq-3"></div>
         <div class="square sq-yellow sq-4"></div>
         <div class="square sq-darkblue sq-5"></div>
-        <div class="square sq-lightblue sq-6"></div>
     </div>
 
     <img src="/static/logo.png" alt="Logo Policlínica Metropolitana" class="logo-img" />
@@ -108,7 +105,7 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         <form method="POST" action="/login">
             <div class="input-group">
                 <label for="emp_code">Ingrese su Código de Empleado</label>
-                <input type="password" id="emp_code" name="emp_code" placeholder="Ej: 123456" required autofocus autocomplete="off" />
+                <input type="text" id="emp_code" name="emp_code" placeholder="Ej: 123456" required autofocus autocomplete="off" />
             </div>
             <button type="submit">Ingresar</button>
         </form>
@@ -409,9 +406,8 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 
     {% raw %}
     <script>
-        // --- CONTROL DE INACTIVIDAD (10 MINUTOS) ---
         var inactivityTimer;
-        var INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutos en milisegundos
+        var INACTIVITY_LIMIT = 10 * 60 * 1000;
 
         function resetInactivityTimer() {
             clearTimeout(inactivityTimer);
@@ -421,7 +417,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             }, INACTIVITY_LIMIT);
         }
 
-        // Detectar cualquier interacción del usuario
         window.onload = resetInactivityTimer;
         document.onmousemove = resetInactivityTimer;
         document.onkeypress = resetInactivityTimer;
@@ -659,50 +654,5 @@ def map_view(code):
 def get_gps():
     return jsonify(gps_data)
 
-@app.route('/traccar', methods=['GET', 'POST'])
-@app.route('/api/gps', methods=['POST'])
-def update_gps():
-    unit_id = request.args.get('unit') or request.form.get('unit') or 'Unidad-01'
-    lat = request.args.get('lat') or request.form.get('lat')
-    lng = request.args.get('lon') or request.form.get('lng') or request.form.get('lon') or request.form.get('lng')
-    speed = request.args.get('speed') or request.form.get('speed') or 0
-    timestamp = request.args.get('timestamp') or request.form.get('timestamp')
-
-    if not lat and request.is_json:
-        data = request.get_json(silent=True) or {}
-        unit_id = data.get('unit', 'Unidad-01')
-        lat = data.get('lat') or data.get('latitude')
-        lng = data.get('lon') or data.get('lng') or data.get('longitude')
-        speed = data.get('speed', 0)
-        timestamp = data.get('timestamp') or data.get('time')
-
-    if unit_id not in gps_data:
-        unit_id = 'Unidad-01'
-
-    if lat and lng:
-        try:
-            speed_kmh = round(float(speed) * 1.852, 1) if float(speed) < 100 else round(float(speed), 1)
-            if timestamp:
-                try:
-                    dt_utc = datetime.datetime.fromtimestamp(int(timestamp), datetime.timezone.utc)
-                    fecha_fmt = dt_utc.astimezone(tz_caracas).strftime("%H:%M:%S")
-                except ValueError:
-                    fecha_fmt = datetime.datetime.now(tz_caracas).strftime("%H:%M:%S")
-            else:
-                fecha_fmt = datetime.datetime.now(tz_caracas).strftime("%H:%M:%S")
-
-            gps_data[unit_id] = {
-                'lat': float(lat),
-                'lng': float(lng),
-                'speed': speed_kmh,
-                'fecha': fecha_fmt
-            }
-            return "OK", 200
-        except ValueError:
-            pass
-
-    return "OK", 200
-
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000, debug=True)

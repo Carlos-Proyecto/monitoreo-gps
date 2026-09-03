@@ -50,9 +50,9 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
     <title>Ingreso - Policlínica Metropolitana</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { 
-            width: 100vw; min-height: 100vh; background-color: #ffffff; 
-            display: flex; flex-direction: column; justify-content: space-between; align-items: center; 
+        body {
+            width: 100vw; min-height: 100vh; background-color: #ffffff;
+            display: flex; flex-direction: column; justify-content: space-between; align-items: center;
             padding: 20px; position: relative; overflow-x: hidden;
         }
         .bg-squares { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: 1; pointer-events: none; }
@@ -70,18 +70,38 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         .header-title { font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.2; }
         .header-subtitle { font-size: 13px; font-weight: 600; color: #475569; margin-top: 2px; }
         .header-system { font-size: 14.5px; font-weight: 700; color: #0284c7; margin-top: 2px; }
-        .center-container { 
-            width: 100%; max-width: 320px; text-align: center; display: flex; flex-direction: column; 
-            align-items: center; margin: auto; position: relative; z-index: 5; background: rgba(255, 255, 255, 0.92); 
-            padding: 20px 10px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); backdrop-filter: blur(5px);
+
+        /* Contenedor central con traslucidez suave (Glassmorphism) */
+        .center-container {
+            width: 100%; max-width: 320px; text-align: center; display: flex; flex-direction: column;
+            align-items: center; margin: auto; position: relative; z-index: 5;
+            background: rgba(255, 255, 255, 0.55);
+            padding: 24px 16px; border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.06);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         }
         form { width: 100%; }
         .input-group { margin-bottom: 18px; }
         label { display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; text-align: center; }
-        input[type="text"] { width: 100%; padding: 14px; border-radius: 10px; border: 2px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 14px; text-align: center; outline: none; }
-        input[type="text"]:focus { border-color: #0284c7; }
-        button { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #0284c7; color: #ffffff; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3); }
-        .error-message { background-color: #fef2f2; border: 1px solid #fca5a5; color: #dc2626; font-size: 11px; font-weight: 600; padding: 10px; border-radius: 8px; margin-top: 15px; width: 100%; }
+
+        /* Casilla de texto con fondo semitransparente */
+        input[type="text"] {
+            width: 100%; padding: 14px; border-radius: 10px;
+            border: 1.5px solid rgba(2, 132, 199, 0.3);
+            background: rgba(255, 255, 255, 0.65);
+            color: #0f172a; font-size: 14px; font-weight: 600; text-align: center; outline: none;
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            transition: all 0.3s ease;
+        }
+        input[type="text"]:focus {
+            border-color: #0284c7;
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.15);
+        }
+        button { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #0284c7; color: #ffffff; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3); transition: background 0.2s; }
+        button:hover { background: #0369a1; }
+        .error-message { background-color: rgba(254, 242, 242, 0.85); border: 1px solid #fca5a5; color: #dc2626; font-size: 11px; font-weight: 600; padding: 10px; border-radius: 8px; margin-top: 15px; width: 100%; backdrop-filter: blur(4px); }
     </style>
 </head>
 <body>

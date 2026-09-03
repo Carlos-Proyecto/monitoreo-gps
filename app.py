@@ -429,7 +429,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 
     <div id="map"></div>
 
-    <!-- Variables Jinja2 fuertemente evaluadas fuera de {% raw %} -->
+    <!-- Variables Jinja2 -->
     <script>
         var userCode = "{{ code }}";
     </script>
@@ -487,13 +487,13 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         }
 
         var unitsCoords = {
-            "Unidad-01": { lat: 10.4765223, lon: -66.8326641, speed: 0 },
-            "Unidad-02": { lat: 10.4782000, lon: -66.8341000, speed: 0 },
-            "Unidad-03": { lat: 10.4751000, lon: -66.8309000, speed: 0 }
+            "Unidad-01": { lat: 10.4765223, lon: -66.8326641, speed: 0, rotation: 0 },
+            "Unidad-02": { lat: 10.4782000, lon: -66.8341000, speed: 0, rotation: 0 },
+            "Unidad-03": { lat: 10.4751000, lon: -66.8309000, speed: 0, rotation: 0 }
         };
 
         var vanSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="26" height="26">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="28" height="28">
                 <ellipse cx="32" cy="54" rx="26" ry="6" fill="rgba(0,0,0,0.3)"/>
                 <path d="M 10 24 C 10 20, 14 18, 20 18 L 44 18 C 50 18, 54 22, 56 28 L 58 38 C 58 42, 56 46, 52 46 L 12 46 C 8 46, 6 42, 6 36 L 6 28 Z" fill="#FFFFFF" stroke="#1E293B" stroke-width="2.5" stroke-linejoin="round"/>
                 <path d="M 42 21 L 52 28 L 42 28 Z" fill="#38BDF8"/>
@@ -526,7 +526,13 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 unitId: key, isUnit: true
             });
             f.setStyle(new ol.style.Style({
-                image: new ol.style.Icon({ anchor: [0.5, 0.5], src: vanSvg, scale: 1.0 })
+                image: new ol.style.Icon({ 
+                    anchor: [0.5, 0.5], 
+                    src: vanSvg, 
+                    scale: 1.0,
+                    rotation: 0,
+                    rotateWithView: true
+                })
             }));
             unitFeatures[key] = f;
         });
@@ -609,6 +615,65 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             });
         }
 
+        // --- CÁLCULO DE ÁNGULO DE ORIENTACIÓN (BEARING) ---
+        function calculateBearing(startLon, startLat, endLon, endLat) {
+            var rad = Math.PI / 180;
+            var lat1 = startLat * rad;
+            var lat2 = endLat * rad;
+            var dLon = (endLon - startLon) * rad;
+
+            var y = Math.sin(dLon) * Math.cos(lat2);
+            var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+
+            return Math.atan2(y, x); // Retorna el ángulo en radianes
+        }
+
+        // --- ANIMACIÓN DE MOVIMIENTO E INTERPOLACIÓN ---
+        var activeAnimations = {};
+
+        function animateMarker(unitKey, startLonLat, endLonLat, duration, targetRotation) {
+            if (activeAnimations[unitKey]) {
+                cancelAnimationFrame(activeAnimations[unitKey]);
+            }
+
+            var startTime = Date.now();
+            var feature = unitFeatures[unitKey];
+            var currentStyle = feature.getStyle();
+            var currentRotation = currentStyle.getImage().getRotation() || 0;
+
+            function step() {
+                var elapsed = Date.now() - startTime;
+                var progress = Math.min(elapsed / duration, 1);
+
+                // Interpolación lineal de la posición
+                var currentLon = startLonLat[0] + (endLonLat[0] - startLonLat[0]) * progress;
+                var currentLat = startLonLat[1] + (endLonLat[1] - startLonLat[1]) * progress;
+
+                // Interpolación de la rotación
+                var rot = currentRotation + (targetRotation - currentRotation) * progress;
+
+                // Actualización de geometría y estilo de la marca
+                feature.getGeometry().setCoordinates(ol.proj.fromLonLat([currentLon, currentLat]));
+                
+                var newStyle = new ol.style.Style({
+                    image: new ol.style.Icon({
+                        anchor: [0.5, 0.5],
+                        src: vanSvg,
+                        scale: 1.0,
+                        rotation: rot,
+                        rotateWithView: true
+                    })
+                });
+                feature.setStyle(newStyle);
+
+                if (progress < 1) {
+                    activeAnimations[unitKey] = requestAnimationFrame(step);
+                }
+            }
+
+            step();
+        }
+
         function updateData() {
             fetch('/api/gps?' + new Date().getTime())
                 .then(res => res.json())
@@ -617,13 +682,28 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                         unitKeys.forEach(function(key) {
                             if (data[key]) {
                                 var uData = data[key];
-                                unitsCoords[key].lat = uData.lat;
-                                unitsCoords[key].lon = uData.lng;
-                                unitFeatures[key].getGeometry().setCoordinates(ol.proj.fromLonLat([uData.lng, uData.lat]));
+                                var oldLon = unitsCoords[key].lon;
+                                var oldLat = unitsCoords[key].lat;
+                                var newLon = uData.lng;
+                                var newLat = uData.lat;
+
+                                // Solo animar e interpolar si las coordenadas variaron
+                                if (oldLon !== newLon || oldLat !== newLat) {
+                                    var bearing = calculateBearing(oldLon, oldLat, newLon, newLat);
+
+                                    // Transición fluida durante 2000 ms
+                                    animateMarker(key, [oldLon, oldLat], [newLon, newLat], 2000, bearing);
+
+                                    // Guardar nueva posición de origen
+                                    unitsCoords[key].lat = newLat;
+                                    unitsCoords[key].lon = newLon;
+                                    unitsCoords[key].rotation = bearing;
+                                }
                             }
                         });
                     }
-                });
+                })
+                .catch(err => console.error("Error al actualizar posiciones GPS:", err));
         }
 
         setInterval(updateData, 2500);
@@ -667,7 +747,7 @@ INCIDENT_REPORT_TEMPLATE = """<!DOCTYPE html>
                     <span class="inc-type">{{ item.tipo }}</span>
                 </div>
                 <div class="details">
-                    <div><b>Reportado por:</b> {{ item.reportado_por }} (Código: {{ item.codigo }})</div>
+                    <div><b>Reportado por:</b> {{ item.reportado_por }} (Código: {{ item.codigo }} )</div>
                     <div><b>Cargo:</b> {{ item.cargo }}</div>
                     <div><b>Hora:</b> {{ item.hora }}</div>
                 </div>

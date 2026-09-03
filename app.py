@@ -5,23 +5,23 @@ from flask import Flask, jsonify, request, render_template_string, redirect, url
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 
-# Base de datos de empleados (Añadido el atributo "es_admin" para control de acceso)
+# Base de datos de empleados (Añadido "es_admin" para control de acceso)
 EMPLEADOS_DB = {
     "105544": {
         "nombre": "Carlos Serrano",
         "cargo": "Coordinador de Operaciones de Seguridad",
         "gerencia": "Gerencia de Seguridad Integral",
-        "es_admin": True  # <--- Puede ver las notificaciones
+        "es_admin": True  # Permiso para ver reportes de incidentes
     },
     "123456": {
         "nombre": "Usuario de Prueba",
         "cargo": "Operador de Monitoreo",
         "gerencia": "Gerencia de Seguridad Integral",
-        "es_admin": False # <--- Solo puede reportar
+        "es_admin": False
     }
 }
 
-# Almacenamiento en memoria para los incidentes reportados
+# Registro en memoria para almacenar reportes de incidentes
 INCIDENTES_DB = []
 
 tz_caracas = datetime.timezone(datetime.timedelta(hours=-4))
@@ -62,7 +62,6 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         .header-title { font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.2; }
         .header-subtitle { font-size: 13px; font-weight: 600; color: #475569; margin-top: 2px; }
         .header-system { font-size: 14.5px; font-weight: 700; color: #0284c7; margin-top: 2px; }
-
         .center-container {
             width: 100%; max-width: 320px; text-align: center; display: flex; flex-direction: column;
             align-items: center; margin: auto; position: relative; z-index: 5;
@@ -302,7 +301,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             color: #ffffff; font-size: 11px; font-weight: 800; cursor: pointer;
         }
 
-        /* Formulario de Incidentes */
         .incident-select, .incident-btn-submit {
             width: 100%; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 11px; font-weight: 700;
         }
@@ -403,7 +401,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- Modal Registrar Incidente -->
+    <!-- Modal Reportar Incidente -->
     <div class="modal-overlay" id="incidentModal" onclick="toggleModal('incidentModal', false)">
         <div class="modal-box" onclick="event.stopPropagation()">
             <div class="modal-title incident-title">🚨 Reportar Incidente</div>
@@ -431,9 +429,13 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 
     <div id="map"></div>
 
-    {% raw %}
+    <!-- Variables Jinja2 fuertemente evaluadas fuera de {% raw %} -->
     <script>
         var userCode = "{{ code }}";
+    </script>
+
+    {% raw %}
+    <script>
         var inactivityTimer;
         var INACTIVITY_LIMIT = 10 * 60 * 1000;
 
@@ -633,7 +635,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 </body>
 </html>"""
 
-# Vista HTML de la lista de Reportes de Incidentes (Solo Admin)
 INCIDENT_REPORT_TEMPLATE = """<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -717,7 +718,6 @@ def map_view(code):
 def get_gps():
     return jsonify(gps_data)
 
-# Endpoint donde el mapa envía el reporte de incidente en segundo plano
 @app.route('/api/incidente', methods=['POST'])
 def registrar_incidente():
     data = request.get_json() or {}
@@ -735,11 +735,10 @@ def registrar_incidente():
             "cargo": emp["cargo"],
             "hora": datetime.datetime.now(tz_caracas).strftime("%d/%m/%Y - %I:%M:%S %p")
         }
-        INCIDENTES_DB.insert(0, nuevo_incidente) # Agregar al inicio
+        INCIDENTES_DB.insert(0, nuevo_incidente)
         return jsonify({"status": "OK"}), 200
     return jsonify({"status": "ERROR"}), 400
 
-# Ruta protegida donde solo los usuarios administradores pueden consultar las alertas
 @app.route('/admin/incidentes/<code>', methods=['GET'])
 def ver_incidentes(code):
     if code not in EMPLEADOS_DB or not EMPLEADOS_DB[code].get("es_admin"):

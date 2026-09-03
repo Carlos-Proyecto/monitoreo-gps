@@ -5,32 +5,41 @@ from flask import Flask, jsonify, request, render_template_string, redirect, url
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 
-# Base de datos de empleados (Añadido "es_admin" para control de acceso)
 EMPLEADOS_DB = {
     "105544": {
         "nombre": "Carlos Serrano",
         "cargo": "Coordinador de Operaciones de Seguridad",
-        "gerencia": "Gerencia de Seguridad Integral",
-        "es_admin": True  # Permiso para ver reportes de incidentes
+        "gerencia": "Gerencia de Seguridad Integral"
     },
     "123456": {
         "nombre": "Usuario de Prueba",
         "cargo": "Operador de Monitoreo",
-        "gerencia": "Gerencia de Seguridad Integral",
-        "es_admin": False
+        "gerencia": "Gerencia de Seguridad Integral"
     }
 }
-
-# Registro en memoria para almacenar reportes de incidentes
-INCIDENTES_DB = []
 
 tz_caracas = datetime.timezone(datetime.timedelta(hours=-4))
 now = datetime.datetime.now(tz_caracas)
 
 gps_data = {
-    "Unidad-01": {"lat": 10.4765223, "lng": -66.8326641, "speed": 0, "fecha": now.strftime("%H:%M:%S")},
-    "Unidad-02": {"lat": 10.4782000, "lng": -66.8341000, "speed": 0, "fecha": now.strftime("%H:%M:%S")},
-    "Unidad-03": {"lat": 10.4751000, "lng": -66.8309000, "speed": 0, "fecha": now.strftime("%H:%M:%S")}
+    "Unidad-01": {
+        "lat": 10.4765223,
+        "lng": -66.8326641,
+        "speed": 0,
+        "fecha": now.strftime("%H:%M:%S")
+    },
+    "Unidad-02": {
+        "lat": 10.4782000,
+        "lng": -66.8341000,
+        "speed": 0,
+        "fecha": now.strftime("%H:%M:%S")
+    },
+    "Unidad-03": {
+        "lat": 10.4751000,
+        "lng": -66.8309000,
+        "speed": 0,
+        "fecha": now.strftime("%H:%M:%S")
+    }
 }
 
 LOGIN_TEMPLATE = """<!DOCTYPE html>
@@ -41,7 +50,11 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
     <title>Ingreso - Policlínica Metropolitana</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { width: 100vw; min-height: 100vh; background-color: #ffffff; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 20px; position: relative; overflow-x: hidden; }
+        body {
+            width: 100vw; min-height: 100vh; background-color: #ffffff;
+            display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+            padding: 20px; position: relative; overflow-x: hidden;
+        }
         .bg-squares { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: 1; pointer-events: none; }
         .square { position: absolute; border-radius: 4px; opacity: 0.85; }
         .sq-yellow { background-color: #eab308; }
@@ -62,23 +75,35 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         .header-title { font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.2; }
         .header-subtitle { font-size: 13px; font-weight: 600; color: #475569; margin-top: 2px; }
         .header-system { font-size: 14.5px; font-weight: 700; color: #0284c7; margin-top: 2px; }
+
+        /* Contenedor central con traslucidez suave (Glassmorphism) */
         .center-container {
             width: 100%; max-width: 320px; text-align: center; display: flex; flex-direction: column;
             align-items: center; margin: auto; position: relative; z-index: 5;
-            background: rgba(255, 255, 255, 0.55); padding: 24px 16px; border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.7); box-shadow: 0 8px 32px rgba(0,0,0,0.06);
+            background: rgba(255, 255, 255, 0.55);
+            padding: 24px 16px; border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.06);
             backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         }
         form { width: 100%; }
         .input-group { margin-bottom: 18px; }
         label { display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; text-align: center; }
+
+        /* Casilla de texto con fondo semitransparente */
         input[type="text"] {
             width: 100%; padding: 14px; border-radius: 10px;
-            border: 1.5px solid rgba(2, 132, 199, 0.3); background: rgba(255, 255, 255, 0.65);
+            border: 1.5px solid rgba(2, 132, 199, 0.3);
+            background: rgba(255, 255, 255, 0.65);
             color: #0f172a; font-size: 14px; font-weight: 600; text-align: center; outline: none;
-            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); transition: all 0.3s ease;
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            transition: all 0.3s ease;
         }
-        input[type="text"]:focus { border-color: #0284c7; background: rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.15); }
+        input[type="text"]:focus {
+            border-color: #0284c7;
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.15);
+        }
         button { width: 100%; padding: 14px; border-radius: 10px; border: none; background: #0284c7; color: #ffffff; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3); transition: background 0.2s; }
         button:hover { background: #0369a1; }
         .error-message { background-color: rgba(254, 242, 242, 0.85); border: 1px solid #fca5a5; color: #dc2626; font-size: 11px; font-weight: 600; padding: 10px; border-radius: 8px; margin-top: 15px; width: 100%; backdrop-filter: blur(4px); }
@@ -96,12 +121,15 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         <div class="square sq-gray sq-8"></div>
         <div class="square sq-gray sq-9"></div>
     </div>
+
     <img src="/static/logo.png" alt="Logo Policlínica Metropolitana" class="logo-img" />
+
     <div class="top-header">
         <div class="header-title">Policlínica Metropolitana</div>
         <div class="header-subtitle">Gerencia de Seguridad Integral</div>
         <div class="header-system">Seguimiento de Transporte</div>
     </div>
+
     <div class="center-container">
         <form method="POST" action="/login">
             <div class="input-group">
@@ -114,6 +142,7 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         <div class="error-message">{{ error }}</div>
         {% endif %}
     </div>
+    <div></div>
 </body>
 </html>"""
 
@@ -130,6 +159,7 @@ WELCOME_TEMPLATE = """<!DOCTYPE html>
         .square { position: absolute; border-radius: 4px; opacity: 0.85; }
         .sq-yellow { background-color: #eab308; }
         .sq-darkblue { background-color: #0f4c5c; }
+        .sq-lightblue { background-color: #38bdf8; }
         .sq-1 { top: 12%; right: 8%; width: 32px; height: 32px; transform: rotate(25deg); }
         .sq-2 { top: 30%; left: 5%; width: 38px; height: 38px; transform: rotate(10deg); }
         .logo-img { position: absolute; top: 10px; left: 4px; width: 75px; height: 75px; object-fit: contain; z-index: 10; }
@@ -171,6 +201,7 @@ WELCOME_TEMPLATE = """<!DOCTYPE html>
         <div class="loading-text">Cargando el sistema de monitoreo...</div>
         <div class="timer-circle" id="countdown">5</div>
     </div>
+    <div></div>
     <script>
         let seconds = 5;
         const timerElement = document.getElementById('countdown');
@@ -197,6 +228,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         html, body { width: 100vw; height: 100vh; overflow: hidden; background: #0f172a; }
+        
         #map { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
 
         .top-container {
@@ -206,7 +238,8 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         }
 
         .header-banner {
-            width: 100%; background: rgba(15, 23, 42, 0.88);
+            width: 100%;
+            background: rgba(15, 23, 42, 0.88);
             backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 12px; padding: 6px 10px; color: #ffffff;
@@ -218,7 +251,8 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         .header-line3 { font-size: 10px; font-weight: 700; color: #38bdf8; margin-top: 1px; }
 
         .stops-panel {
-            width: 100%; background: rgba(15, 23, 42, 0.85);
+            width: 100%;
+            background: rgba(15, 23, 42, 0.85);
             backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(245, 158, 11, 0.25);
             border-radius: 10px; padding: 5px 8px;
@@ -230,7 +264,8 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         .stops-bar { display: flex; gap: 5px; justify-content: center; width: 100%; }
 
         .stop-btn {
-            background: rgba(15, 23, 42, 0.90); border: 1px solid rgba(245, 158, 11, 0.4);
+            background: rgba(15, 23, 42, 0.90);
+            border: 1px solid rgba(245, 158, 11, 0.4);
             color: #f59e0b; font-weight: 700; font-size: 9.5px;
             padding: 3px 8px; border-radius: 6px; cursor: pointer; user-select: none; transition: all 0.2s ease;
         }
@@ -245,20 +280,24 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         .action-bar { display: flex; gap: 5px; justify-content: center; width: 100%; }
 
         .action-btn {
-            background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(10px);
             padding: 4px 8px; border-radius: 6px; font-size: 9px; font-weight: 700; text-decoration: none;
             display: inline-flex; align-items: center; cursor: pointer; transition: all 0.2s;
         }
         .schedule-btn { border: 1px solid rgba(168, 85, 247, 0.5); color: #c084fc; }
-        .incident-btn { border: 1px solid rgba(239, 68, 68, 0.5); color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .incident-btn { border: 1px solid rgba(239, 68, 68, 0.5); color: #ef4444; }
         .survey-btn { border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; }
-        .admin-btn { border: 1px solid rgba(234, 179, 8, 0.5); color: #eab308; }
 
-        .units-row { width: 100%; display: flex; gap: 4px; justify-content: space-between; }
+        .units-row {
+            width: 100%; display: flex; gap: 4px; justify-content: space-between;
+        }
 
         .unit-card {
-            flex: 1; background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-            border: 1px solid rgba(56, 239, 125, 0.35); border-radius: 8px; padding: 6px 4px; color: #ffffff;
+            flex: 1; background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 239, 125, 0.35);
+            border-radius: 8px; padding: 6px 4px; color: #ffffff;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); cursor: pointer; user-select: none;
             display: flex; flex-direction: column; justify-content: space-between; text-align: center;
         }
@@ -271,6 +310,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         .unit-body { display: flex; flex-direction: column; gap: 1px; margin: 3px 0; }
         .unit-target { font-size: 8px; font-weight: 700; color: #f59e0b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .unit-eta { font-size: 8.5px; font-weight: 800; color: #38bdf8; }
+
         .unit-hint { font-size: 6.5px; color: #64748b; margin-top: 1px; text-transform: uppercase; font-weight: 700; }
 
         .modal-overlay {
@@ -289,24 +329,15 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         .modal-overlay.active .modal-box { transform: scale(1); }
 
         .modal-title { font-size: 14px; font-weight: 800; color: #c084fc; margin-bottom: 10px; }
-        .modal-title.incident-title { color: #ef4444; }
-
         .schedule-group { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 8px; margin-bottom: 8px; text-align: center; }
         .schedule-header { font-weight: 800; font-size: 10.5px; color: #38bdf8; margin-bottom: 4px; text-transform: uppercase; }
         .schedule-list { list-style: none; font-size: 10px; color: #cbd5e1; font-weight: 600; line-height: 1.4; }
 
         .modal-close-btn {
-            margin-top: 6px; width: 100%; padding: 8px; border: none; border-radius: 8px;
-            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #ffffff; font-size: 11px; font-weight: 800; cursor: pointer;
+            margin-top: 2px; width: 100%; padding: 8px; border: none; border-radius: 8px;
+            background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5);
+            color: #c084fc; font-size: 11px; font-weight: 800; cursor: pointer;
         }
-
-        .incident-select, .incident-btn-submit {
-            width: 100%; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 11px; font-weight: 700;
-        }
-        .incident-select { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(255, 255, 255, 0.2); color: #ffffff; outline: none; }
-        .incident-btn-submit { background: #ef4444; color: #ffffff; border: none; cursor: pointer; }
-        .incident-btn-submit:hover { background: #dc2626; }
     </style>
 </head>
 <body>
@@ -330,19 +361,20 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 
     <div class="bottom-controls">
         <div class="action-bar">
-            <button onclick="toggleModal('scheduleModal', true)" class="action-btn schedule-btn">🕒 Horarios</button>
-            <button onclick="toggleModal('incidentModal', true)" class="action-btn incident-btn">🚨 Incidente</button>
-            <a href="https://forms.gle/MERriZ2iw7zrfcY27" target="_blank" rel="noopener noreferrer" class="action-btn survey-btn">⭐ Encuesta</a>
-            {% if emp.es_admin %}
-            <a href="{{ url_for('ver_incidentes', code=code) }}" class="action-btn admin-btn">📋 Reportes</a>
-            {% endif %}
+            <button onclick="toggleModal(true)" class="action-btn schedule-btn">🕒 Horarios</button>
+            <a href="#" id="incident-link" target="_blank" class="action-btn incident-btn">🚨 Incidente</a>
+            <a href="https://forms.gle/MERriZ2iw7zrfcY27" 
+           id="survey-link" 
+           target="_blank" 
+           rel="noopener noreferrer" 
+           class="action-btn survey-btn">⭐ Encuesta</a>
         </div>
 
         <div class="units-row">
             <div class="unit-card" onclick="centerOnUnit('Unidad-01')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-01</span>
-                    <span class="unit-status" id="unit-status-1">--</span>
+                    <span class="unit-status">EN LÍNEA</span>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-1">➡️ --</div>
@@ -354,7 +386,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-02')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-02</span>
-                    <span class="unit-status" id="unit-status-2">--</span>
+                    <span class="unit-status">EN LÍNEA</span>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-2">➡️ --</div>
@@ -366,7 +398,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-03')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-03</span>
-                    <span class="unit-status" id="unit-status-3">--</span>
+                    <span class="unit-status">EN LÍNEA</span>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-3">➡️ --</div>
@@ -377,10 +409,10 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- Modal Horarios -->
-    <div class="modal-overlay" id="scheduleModal" onclick="toggleModal('scheduleModal', false)">
+    <div class="modal-overlay" id="scheduleModal" onclick="toggleModal(false)">
         <div class="modal-box" onclick="event.stopPropagation()">
             <div class="modal-title">🕒 Horario de Transporte</div>
+            
             <div class="schedule-group">
                 <div class="schedule-header">📅 Lunes a Viernes</div>
                 <ul class="schedule-list">
@@ -389,6 +421,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                     <li>🌙 04:00 p.m. a 08:30 p.m.</li>
                 </ul>
             </div>
+
             <div class="schedule-group">
                 <div class="schedule-header">🎉 Sábados, Domingos y Feriados</div>
                 <ul class="schedule-list">
@@ -397,42 +430,12 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                     <li>🌙 04:00 p.m. a 08:00 p.m.</li>
                 </ul>
             </div>
-            <button class="modal-close-btn" onclick="toggleModal('scheduleModal', false)">Cerrar</button>
-        </div>
-    </div>
 
-    <!-- Modal Reportar Incidente -->
-    <div class="modal-overlay" id="incidentModal" onclick="toggleModal('incidentModal', false)">
-        <div class="modal-box" onclick="event.stopPropagation()">
-            <div class="modal-title incident-title">🚨 Reportar Incidente</div>
-            <form id="incidentForm" onsubmit="submitIncident(event)">
-                <select id="inc_unit" class="incident-select" required>
-                    <option value="">Seleccione la Unidad...</option>
-                    <option value="Unidad-01">Unidad-01</option>
-                    <option value="Unidad-02">Unidad-02</option>
-                    <option value="Unidad-03">Unidad-03</option>
-                </select>
-
-                <select id="inc_type" class="incident-select" required>
-                    <option value="">Seleccione Tipo de Incidente...</option>
-                    <option value="Unidad Accidentada">Unidad Accidentada</option>
-                    <option value="Colisión">Colisión</option>
-                    <option value="Riña">Riña</option>
-                    <option value="Sobre Carga">Sobre Carga</option>
-                </select>
-
-                <button type="submit" class="incident-btn-submit">Enviar Reporte</button>
-            </form>
-            <button class="modal-close-btn" onclick="toggleModal('incidentModal', false)">Cancelar</button>
+            <button class="modal-close-btn" onclick="toggleModal(false)">Cerrar</button>
         </div>
     </div>
 
     <div id="map"></div>
-
-    <!-- Variables Jinja2 -->
-    <script>
-        var userCode = "{{ code }}";
-    </script>
 
     {% raw %}
     <script>
@@ -452,48 +455,22 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         document.onkeypress = resetInactivityTimer;
         document.ontouchstart = resetInactivityTimer;
         document.onclick = resetInactivityTimer;
+        document.onscroll = resetInactivityTimer;
 
-        function toggleModal(modalId, show) {
-            var modal = document.getElementById(modalId);
+        var unitsCoords = {
+            "Unidad-01": { lat: 10.4765223, lon: -66.8326641, speed: 0 },
+            "Unidad-02": { lat: 10.4782000, lon: -66.8341000, speed: 0 },
+            "Unidad-03": { lat: 10.4751000, lon: -66.8309000, speed: 0 }
+        };
+
+        function toggleModal(show) {
+            var modal = document.getElementById('scheduleModal');
             if (show) modal.classList.add('active');
             else modal.classList.remove('active');
         }
 
-        function submitIncident(e) {
-            e.preventDefault();
-            var unit = document.getElementById('inc_unit').value;
-            var type = document.getElementById('inc_type').value;
-
-            fetch('/api/incidente', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    code: userCode,
-                    unidad: unit,
-                    tipo: type
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'OK') {
-                    alert('Incidente reportado exitosamente.');
-                    toggleModal('incidentModal', false);
-                    document.getElementById('incidentForm').reset();
-                } else {
-                    alert('Error enviando el reporte.');
-                }
-            })
-            .catch(() => alert('Error de conexión.'));
-        }
-
-        var unitsCoords = {
-            "Unidad-01": { lat: 10.4765223, lon: -66.8326641, speed: 0, rotation: 0 },
-            "Unidad-02": { lat: 10.4782000, lon: -66.8341000, speed: 0, rotation: 0 },
-            "Unidad-03": { lat: 10.4751000, lon: -66.8309000, speed: 0, rotation: 0 }
-        };
-
         var vanSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="28" height="28">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="26" height="26">
                 <ellipse cx="32" cy="54" rx="26" ry="6" fill="rgba(0,0,0,0.3)"/>
                 <path d="M 10 24 C 10 20, 14 18, 20 18 L 44 18 C 50 18, 54 22, 56 28 L 58 38 C 58 42, 56 46, 52 46 L 12 46 C 8 46, 6 42, 6 36 L 6 28 Z" fill="#FFFFFF" stroke="#1E293B" stroke-width="2.5" stroke-linejoin="round"/>
                 <path d="M 42 21 L 52 28 L 42 28 Z" fill="#38BDF8"/>
@@ -523,16 +500,11 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         unitKeys.forEach(function(key) {
             var f = new ol.Feature({
                 geometry: new ol.geom.Point(ol.proj.fromLonLat([unitsCoords[key].lon, unitsCoords[key].lat])),
-                unitId: key, isUnit: true
+                unitId: key,
+                isUnit: true
             });
             f.setStyle(new ol.style.Style({
-                image: new ol.style.Icon({ 
-                    anchor: [0.5, 0.5], 
-                    src: vanSvg, 
-                    scale: 1.0,
-                    rotation: 0,
-                    rotateWithView: true
-                })
+                image: new ol.style.Icon({ anchor: [0.5, 0.5], src: vanSvg, scale: 1.0 })
             }));
             unitFeatures[key] = f;
         });
@@ -549,7 +521,8 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         var stopFeatures = stopsData.map(function(s) {
             var feature = new ol.Feature({
                 geometry: new ol.geom.Point(ol.proj.fromLonLat([s.lon, s.lat])),
-                stopId: s.id, isStop: true
+                stopId: s.id,
+                isStop: true
             });
             feature.setStyle(new ol.style.Style({
                 image: new ol.style.Icon({ anchor: [0.5, 1.0], src: createStopSvg(s.badge), scale: 1.0 })
@@ -557,19 +530,50 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             return feature;
         });
 
-        var vectorSource = new ol.source.Vector({ features: [unitFeatures["Unidad-01"], unitFeatures["Unidad-02"], unitFeatures["Unidad-03"]].concat(stopFeatures) });
+        var allFeatures = [unitFeatures["Unidad-01"], unitFeatures["Unidad-02"], unitFeatures["Unidad-03"]].concat(stopFeatures);
+        var vectorSource = new ol.source.Vector({ features: allFeatures });
         var vectorLayer = new ol.layer.Vector({ source: vectorSource });
 
         var map = new ol.Map({
             target: 'map',
-            layers: [new ol.layer.Tile({ source: new ol.source.OSM() }), vectorLayer],
-            view: new ol.View({ center: ol.proj.fromLonLat([-66.8326641, 10.4765223]), zoom: 16.5 }),
+            layers: [
+                new ol.layer.Tile({ source: new ol.source.OSM() }),
+                vectorLayer
+            ],
+            view: new ol.View({
+                center: ol.proj.fromLonLat([-66.8326641, 10.4765223]),
+                zoom: 16.5
+            }),
             controls: []
+        });
+
+        var selectInteraction = new ol.interaction.Select({ filter: f => f.get('isStop') === true });
+        var translateInteraction = new ol.interaction.Translate({ features: selectInteraction.getFeatures() });
+
+        map.addInteraction(selectInteraction);
+        map.addInteraction(translateInteraction);
+
+        translateInteraction.on('translateend', function(e) {
+            e.features.forEach(function(feature) {
+                if (feature.get('isStop')) {
+                    var coords = ol.proj.toLonLat(feature.getGeometry().getCoordinates());
+                    var stopId = feature.get('stopId');
+                    var match = stopsData.find(s => s.id === stopId);
+                    if (match) {
+                        match.lon = coords[0];
+                        match.lat = coords[1];
+                        localStorage.setItem('pcm_stops_coords_v4', JSON.stringify(stopsData));
+                    }
+                }
+            });
+            updateAllEtas();
         });
 
         function centerOnUnit(unitKey) {
             var u = unitsCoords[unitKey];
-            if (u) map.getView().animate({ center: ol.proj.fromLonLat([u.lon, u.lat]), duration: 600 });
+            if (u) {
+                map.getView().animate({ center: ol.proj.fromLonLat([u.lon, u.lat]), duration: 600 });
+            }
         }
 
         function centerOnStop(stopId) {
@@ -577,101 +581,43 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             if (stop) map.getView().animate({ center: ol.proj.fromLonLat([stop.lon, stop.lat]), duration: 600 });
         }
 
-        function isTimeInRanges(currentMinutes, ranges) {
-            return ranges.some(range => {
-                var start = range[0] * 60 + range[1];
-                var end = range[2] * 60 + range[3];
-                return currentMinutes >= start && currentMinutes <= end;
-            });
+        function getDistanceMeters(lat1, lon1, lat2, lon2) {
+            var R = 6371000;
+            var dLat = (lat2 - lat1) * Math.PI / 180;
+            var dLon = (lon2 - lon1) * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function isWorkingHours() {
-            var now = new Date();
-            var day = now.getDay();
-            var minutesNow = now.getHours() * 60 + now.getMinutes();
+        function updateAllEtas() {
+            unitKeys.forEach(function(key, index) {
+                var u = unitsCoords[key];
+                var idx = index + 1;
+                if (!stopsData || stopsData.length === 0) return;
+                var closestStop = null;
+                var minDistance = Infinity;
 
-            if (day >= 1 && day <= 5) {
-                return isTimeInRanges(minutesNow, [[6, 0, 9, 45], [11, 30, 14, 30], [16, 0, 20, 30]]);
-            } else {
-                return isTimeInRanges(minutesNow, [[6, 30, 9, 30], [11, 30, 14, 0], [16, 0, 20, 0]]);
-            }
-        }
-
-        function updateUnitStatuses() {
-            var active = isWorkingHours();
-            var statusText = active ? "ACTIVA" : "EN DESCANSO";
-            var statusColor = active ? "rgba(56, 239, 125, 0.15)" : "rgba(148, 163, 184, 0.15)";
-            var borderColor = active ? "rgba(56, 239, 125, 0.3)" : "rgba(148, 163, 184, 0.3)";
-            var textColor = active ? "#38ef7d" : "#94a3b8";
-
-            [1, 2, 3].forEach(function(idx) {
-                var el = document.getElementById('unit-status-' + idx);
-                if (el) {
-                    el.innerText = statusText;
-                    el.style.background = statusColor;
-                    el.style.borderColor = borderColor;
-                    el.style.color = textColor;
-                }
-            });
-        }
-
-        // --- CÁLCULO DE ÁNGULO DE ORIENTACIÓN (BEARING) ---
-        function calculateBearing(startLon, startLat, endLon, endLat) {
-            var rad = Math.PI / 180;
-            var lat1 = startLat * rad;
-            var lat2 = endLat * rad;
-            var dLon = (endLon - startLon) * rad;
-
-            var y = Math.sin(dLon) * Math.cos(lat2);
-            var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-
-            return Math.atan2(y, x); // Retorna el ángulo en radianes
-        }
-
-        // --- ANIMACIÓN DE MOVIMIENTO E INTERPOLACIÓN ---
-        var activeAnimations = {};
-
-        function animateMarker(unitKey, startLonLat, endLonLat, duration, targetRotation) {
-            if (activeAnimations[unitKey]) {
-                cancelAnimationFrame(activeAnimations[unitKey]);
-            }
-
-            var startTime = Date.now();
-            var feature = unitFeatures[unitKey];
-            var currentStyle = feature.getStyle();
-            var currentRotation = currentStyle.getImage().getRotation() || 0;
-
-            function step() {
-                var elapsed = Date.now() - startTime;
-                var progress = Math.min(elapsed / duration, 1);
-
-                // Interpolación lineal de la posición
-                var currentLon = startLonLat[0] + (endLonLat[0] - startLonLat[0]) * progress;
-                var currentLat = startLonLat[1] + (endLonLat[1] - startLonLat[1]) * progress;
-
-                // Interpolación de la rotación
-                var rot = currentRotation + (targetRotation - currentRotation) * progress;
-
-                // Actualización de geometría y estilo de la marca
-                feature.getGeometry().setCoordinates(ol.proj.fromLonLat([currentLon, currentLat]));
-                
-                var newStyle = new ol.style.Style({
-                    image: new ol.style.Icon({
-                        anchor: [0.5, 0.5],
-                        src: vanSvg,
-                        scale: 1.0,
-                        rotation: rot,
-                        rotateWithView: true
-                    })
+                stopsData.forEach(function(stop) {
+                    var dist = getDistanceMeters(u.lat, u.lon, stop.lat, stop.lon);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestStop = stop;
+                    }
                 });
-                feature.setStyle(newStyle);
 
-                if (progress < 1) {
-                    activeAnimations[unitKey] = requestAnimationFrame(step);
+                if (closestStop) {
+                    document.getElementById('next-stop-name-' + idx).innerText = '➡️ ' + closestStop.name;
+                    if (minDistance < 35) {
+                        document.getElementById('next-stop-eta-' + idx).innerText = '⏱️ ¡En parada!';
+                    } else {
+                        var effectiveSpeed = u.speed > 5 ? u.speed : 20;
+                        var timeMinutes = Math.round(((minDistance / 1000) / effectiveSpeed) * 60);
+                        document.getElementById('next-stop-eta-' + idx).innerText = '⏱️ ' + (timeMinutes <= 1 ? '<1 min' : '~' + timeMinutes + 'm');
+                    }
                 }
-            }
-
-            step();
+            });
         }
 
         function updateData() {
@@ -679,86 +625,30 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 .then(res => res.json())
                 .then(data => {
                     if (data) {
-                        unitKeys.forEach(function(key) {
+                        unitKeys.forEach(function(key, index) {
                             if (data[key]) {
                                 var uData = data[key];
-                                var oldLon = unitsCoords[key].lon;
-                                var oldLat = unitsCoords[key].lat;
-                                var newLon = uData.lng;
-                                var newLat = uData.lat;
+                                unitsCoords[key].lat = uData.lat;
+                                unitsCoords[key].lon = uData.lng;
+                                unitsCoords[key].speed = uData.speed;
 
-                                // Solo animar e interpolar si las coordenadas variaron
-                                if (oldLon !== newLon || oldLat !== newLat) {
-                                    var bearing = calculateBearing(oldLon, oldLat, newLon, newLat);
-
-                                    // Transición fluida durante 2000 ms
-                                    animateMarker(key, [oldLon, oldLat], [newLon, newLat], 2000, bearing);
-
-                                    // Guardar nueva posición de origen
-                                    unitsCoords[key].lat = newLat;
-                                    unitsCoords[key].lon = newLon;
-                                    unitsCoords[key].rotation = bearing;
-                                }
+                                unitFeatures[key].getGeometry().setCoordinates(ol.proj.fromLonLat([uData.lng, uData.lat]));
                             }
                         });
+                        updateAllEtas();
                     }
                 })
-                .catch(err => console.error("Error al actualizar posiciones GPS:", err));
+                .catch(err => console.log(err));
         }
 
         setInterval(updateData, 2500);
-        setInterval(updateUnitStatuses, 30000);
         updateData();
-        updateUnitStatuses();
+        setTimeout(() => { map.updateSize(); }, 300);
     </script>
     {% endraw %}
 </body>
-</html>"""
-
-INCIDENT_REPORT_TEMPLATE = """<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Reporte de Incidentes - Policlínica Metropolitana</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: #0f172a; color: #ffffff; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; }
-        h2 { color: #ef4444; margin-bottom: 20px; text-align: center; font-size: 20px; }
-        .back-btn { display: inline-block; padding: 8px 16px; background: rgba(255,255,255,0.1); color: #fff; text-decoration: none; border-radius: 8px; font-size: 12px; margin-bottom: 20px; }
-        .card { background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
-        .card-header { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 8px; }
-        .unit-name { font-weight: 800; color: #38bdf8; }
-        .inc-type { font-weight: 800; color: #ef4444; }
-        .details { font-size: 12px; color: #94a3b8; line-height: 1.5; }
-        .no-data { text-align: center; color: #64748b; margin-top: 40px; font-weight: 700; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <a href="{{ url_for('map_view', code=code) }}" class="back-btn">⬅ Volver al Mapa</a>
-        <h2>🚨 Panel de Incidentes Reportados</h2>
-        {% if incidentes %}
-            {% for item in incidentes %}
-            <div class="card">
-                <div class="card-header">
-                    <span class="unit-name">{{ item.unidad }}</span>
-                    <span class="inc-type">{{ item.tipo }}</span>
-                </div>
-                <div class="details">
-                    <div><b>Reportado por:</b> {{ item.reportado_por }} (Código: {{ item.codigo }} )</div>
-                    <div><b>Cargo:</b> {{ item.cargo }}</div>
-                    <div><b>Hora:</b> {{ item.hora }}</div>
-                </div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <div class="no-data">No hay reportes registrados hasta el momento.</div>
-        {% endif %}
-    </div>
-</body>
-</html>"""
+</html>
+"""
 
 @app.after_request
 def add_header(response):
@@ -791,40 +681,11 @@ def welcome(code):
 def map_view(code):
     if code not in EMPLEADOS_DB:
         return redirect(url_for('login'))
-    emp = EMPLEADOS_DB[code]
-    return render_template_string(MAP_TEMPLATE, emp=emp, code=code)
+    return render_template_string(MAP_TEMPLATE)
 
 @app.route('/api/gps', methods=['GET'])
 def get_gps():
     return jsonify(gps_data)
-
-@app.route('/api/incidente', methods=['POST'])
-def registrar_incidente():
-    data = request.get_json() or {}
-    code = data.get('code')
-    unidad = data.get('unidad')
-    tipo = data.get('tipo')
-
-    if code in EMPLEADOS_DB and unidad and tipo:
-        emp = EMPLEADOS_DB[code]
-        nuevo_incidente = {
-            "unidad": unidad,
-            "tipo": tipo,
-            "codigo": code,
-            "reportado_por": emp["nombre"],
-            "cargo": emp["cargo"],
-            "hora": datetime.datetime.now(tz_caracas).strftime("%d/%m/%Y - %I:%M:%S %p")
-        }
-        INCIDENTES_DB.insert(0, nuevo_incidente)
-        return jsonify({"status": "OK"}), 200
-    return jsonify({"status": "ERROR"}), 400
-
-@app.route('/admin/incidentes/<code>', methods=['GET'])
-def ver_incidentes(code):
-    if code not in EMPLEADOS_DB or not EMPLEADOS_DB[code].get("es_admin"):
-        return "Acceso denegado. No tiene permisos de administrador.", 403
-    return render_template_string(INCIDENT_REPORT_TEMPLATE, incidentes=INCIDENTES_DB, code=code)
-
 @app.route('/traccar', methods=['GET', 'POST'])
 def traccar_receiver():
     lat = request.args.get('lat') or request.form.get('lat')
@@ -837,6 +698,7 @@ def traccar_receiver():
             gps_data["Unidad-01"]["lng"] = float(lng)
             gps_data["Unidad-01"]["speed"] = float(speed)
             gps_data["Unidad-01"]["fecha"] = datetime.datetime.now(tz_caracas).strftime("%H:%M:%S")
+            print(f"--> [TRACCAR RECEPTOR] U-01 actualizada: Lat {lat}, Lng {lng}")
             return "OK", 200
         except Exception as e:
             return f"Error: {str(e)}", 400

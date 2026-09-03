@@ -363,7 +363,11 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         <div class="action-bar">
             <button onclick="toggleModal(true)" class="action-btn schedule-btn">🕒 Horarios</button>
             <a href="#" id="incident-link" target="_blank" class="action-btn incident-btn">🚨 Incidente</a>
-            <a href="#" id="survey-link" target="_blank" class="action-btn survey-btn">⭐ Encuesta</a>
+            <a href="https://forms.gle/MERriZ2iw7zrfcY27" 
+           id="survey-link" 
+           target="_blank" 
+           rel="noopener noreferrer" 
+           class="action-btn survey-btn">⭐ Encuesta</a>
         </div>
 
         <div class="units-row">

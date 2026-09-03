@@ -66,10 +66,10 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         .sq-3 { top: 38%; left: 4%; width: 38px; height: 38px; transform: rotate(10deg); }
         .sq-4 { top: 48%; right: 6%; width: 35px; height: 35px; transform: rotate(12deg); }
         .sq-5 { top: 58%; left: 5%; width: 42px; height: 42px; transform: rotate(30deg); }
-        .sq-6 { top: 10%; right: 15%; width: 60px; height: 60px; }
-        .sq-7 { bottom: 20%; left: 10%; width: 45px; height: 45px; }
-        .sq-8 { top: 75%; right: 25%; width: 80px; height: 80px; }
-        .sq-9 { top: 40%; left: 5%; width: 50px; height: 50px; }
+        .sq-6 { top: 10%; right: 15%; width: 32px; height: 32px; }
+        .sq-7 { bottom: 20%; left: 10%; width: 25px; height: 25px; }
+        .sq-8 { top: 75%; right: 25%; width: 38px; height: 38px; }
+        .sq-9 { top: 40%; left: 5%; width: 42px; height: 42px; }
         .logo-img { position: absolute; top: 10px; left: 4px; width: 75px; height: 75px; object-fit: contain; z-index: 10; }
         .top-header { width: 100%; text-align: center; padding-top: 5px; position: relative; z-index: 5; }
         .header-title { font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.2; }

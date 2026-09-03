@@ -60,11 +60,16 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         .sq-yellow { background-color: #eab308; }
         .sq-darkblue { background-color: #0f4c5c; }
         .sq-lightblue { background-color: #38bdf8; }
+        .sq-gray { background-color: #94a3b8; }
         .sq-1 { top: 15%; right: 8%; width: 32px; height: 32px; transform: rotate(25deg); }
         .sq-2 { top: 28%; right: 12%; width: 25px; height: 25px; transform: rotate(35deg); }
         .sq-3 { top: 38%; left: 4%; width: 38px; height: 38px; transform: rotate(10deg); }
         .sq-4 { top: 48%; right: 6%; width: 35px; height: 35px; transform: rotate(12deg); }
         .sq-5 { top: 58%; left: 5%; width: 42px; height: 42px; transform: rotate(30deg); }
+        .sq-6 { top: 10%; right: 15%; width: 60px; height: 60px; }
+        .sq-7 { bottom: 20%; left: 10%; width: 45px; height: 45px; }
+        .sq-8 { top: 75%; right: 25%; width: 80px; height: 80px; }
+        .sq-9 { top: 40%; left: 5%; width: 50px; height: 50px; }
         .logo-img { position: absolute; top: 10px; left: 4px; width: 75px; height: 75px; object-fit: contain; z-index: 10; }
         .top-header { width: 100%; text-align: center; padding-top: 5px; position: relative; z-index: 5; }
         .header-title { font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.2; }
@@ -111,6 +116,10 @@ LOGIN_TEMPLATE = """<!DOCTYPE html>
         <div class="square sq-lightblue sq-3"></div>
         <div class="square sq-yellow sq-4"></div>
         <div class="square sq-darkblue sq-5"></div>
+        <div class="square sq-yellow sq-6"></div>
+        <div class="square sq-yellow sq-7"></div>
+        <div class="square sq-gray sq-8"></div>
+        <div class="square sq-gray sq-9"></div>
     </div>
 
     <img src="/static/logo.png" alt="Logo Policlínica Metropolitana" class="logo-img" />

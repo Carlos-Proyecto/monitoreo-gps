@@ -223,8 +223,9 @@ MAP_TEMPLATE = """<!DOCTYPE html>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Monitoreo de Transporte - Policlínica Metropolitana</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/openlayers/4.6.5/ol.css" type="text/css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/openlayers/4.6.5/ol.js"></script>
+    <!-- Actualización a OpenLayers v10.4.0 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.4.0/ol.css" type="text/css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.4.0/dist/ol.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         html, body { width: 100vw; height: 100vh; overflow: hidden; background: #0f172a; }
@@ -547,8 +548,14 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             controls: []
         });
 
-        var selectInteraction = new ol.interaction.Select({ filter: f => f.get('isStop') === true });
-        var translateInteraction = new ol.interaction.Translate({ features: selectInteraction.getFeatures() });
+        // Interacciones adaptadas a OpenLayers v8+ / v10
+        var selectInteraction = new ol.interaction.Select({ 
+            filter: function(f) { return f.get('isStop') === true; } 
+        });
+        
+        var translateInteraction = new ol.interaction.Translate({ 
+            features: selectInteraction.getFeatures() 
+        });
 
         map.addInteraction(selectInteraction);
         map.addInteraction(translateInteraction);
@@ -686,6 +693,7 @@ def map_view(code):
 @app.route('/api/gps', methods=['GET'])
 def get_gps():
     return jsonify(gps_data)
+
 @app.route('/traccar', methods=['GET', 'POST'])
 def traccar_receiver():
     lat = request.args.get('lat') or request.form.get('lat')

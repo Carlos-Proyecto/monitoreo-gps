@@ -307,6 +307,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         .unit-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 2px; }
         .unit-title { font-size: 9.5px; font-weight: 800; color: #ffffff; }
         .unit-status { font-size: 7.5px; color: #38ef7d; font-weight: 800; background: rgba(56, 239, 125, 0.15); padding: 0.5px 4px; border-radius: 3px; border: 1px solid rgba(56, 239, 125, 0.3); margin-top: 1px; }
+        .unit-status.resting { color: #94a3b8; background: rgba(148, 163, 184, 0.15); border-color: rgba(148, 163, 184, 0.3); }
 
         .unit-body { display: flex; flex-direction: column; gap: 1px; margin: 3px 0; }
         .unit-target { font-size: 8px; font-weight: 700; color: #f59e0b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -375,7 +376,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-01')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-01</span>
-                    <span class="unit-status">EN LÍNEA</span>
+                    <span class="unit-status" id="unit-status-1">ACTIVA</span>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-1">➡️ --</div>
@@ -387,7 +388,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-02')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-02</span>
-                    <span class="unit-status">EN LÍNEA</span>
+                    <span class="unit-status" id="unit-status-2">ACTIVA</span>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-2">➡️ --</div>
@@ -399,7 +400,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-03')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-03</span>
-                    <span class="unit-status">EN LÍNEA</span>
+                    <span class="unit-status" id="unit-status-3">ACTIVA</span>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-3">➡️ --</div>
@@ -468,6 +469,50 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             var modal = document.getElementById('scheduleModal');
             if (show) modal.classList.add('active');
             else modal.classList.remove('active');
+        }
+
+        function checkIsOperating() {
+            var now = new Date();
+            var day = now.getDay();
+            var minutes = now.getHours() * 60 + now.getMinutes();
+
+            var ranges = [];
+            if (day >= 1 && day <= 5) {
+                // Lunes a Viernes
+                ranges = [
+                    [360, 585],   // 06:00 a 09:45
+                    [690, 870],   // 11:30 a 14:30
+                    [960, 1230]   // 16:00 a 20:30
+                ];
+            } else {
+                // Sábados (6) y Domingos (0)
+                ranges = [
+                    [390, 570],   // 06:30 a 09:30
+                    [690, 840],   // 11:30 a 14:00
+                    [960, 1200]   // 16:00 a 20:00
+                ];
+            }
+
+            return ranges.some(function(r) {
+                return minutes >= r[0] && minutes <= r[1];
+            });
+        }
+
+        function updateUnitsOperatingStatus() {
+            var isOperating = checkIsOperating();
+            unitKeys.forEach(function(key, index) {
+                var idx = index + 1;
+                var el = document.getElementById('unit-status-' + idx);
+                if (el) {
+                    if (isOperating) {
+                        el.innerText = 'ACTIVA';
+                        el.classList.remove('resting');
+                    } else {
+                        el.innerText = 'EN DESCANSO';
+                        el.classList.add('resting');
+                    }
+                }
+            });
         }
 
         var vanSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
@@ -628,6 +673,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         }
 
         function updateData() {
+            updateUnitsOperatingStatus();
             fetch('/api/gps?' + new Date().getTime())
                 .then(res => res.json())
                 .then(data => {

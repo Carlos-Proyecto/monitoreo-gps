@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
+
 import os
 import datetime
 from flask import Flask, jsonify, request, render_template_string, redirect, url_for
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
-
-# Lista de códigos de empleados que tienen privilegios de administrador
-ADMIN_CODES = {"105544"}
 
 EMPLEADOS_DB = {
     "105544": {
@@ -21,6 +19,13 @@ EMPLEADOS_DB = {
     }
 }
 
+# Estado global para guardar unidades fuera de servicio
+UNITS_STATUS = {
+    "Unidad-01": "AUTO", # "AUTO" (Activa/En descanso según horario) o "FUERA DE SERVICIO"
+    "Unidad-02": "AUTO",
+    "Unidad-03": "AUTO"
+}
+
 tz_caracas = datetime.timezone(datetime.timedelta(hours=-4))
 now = datetime.datetime.now(tz_caracas)
 
@@ -29,22 +34,19 @@ gps_data = {
         "lat": 10.4765223,
         "lng": -66.8326641,
         "speed": 0,
-        "fecha": now.strftime("%H:%M:%S"),
-        "estado": "OK"
+        "fecha": now.strftime("%H:%M:%S")
     },
     "Unidad-02": {
         "lat": 10.4782000,
         "lng": -66.8341000,
         "speed": 0,
-        "fecha": now.strftime("%H:%M:%S"),
-        "estado": "OK"
+        "fecha": now.strftime("%H:%M:%S")
     },
     "Unidad-03": {
         "lat": 10.4751000,
         "lng": -66.8309000,
         "speed": 0,
-        "fecha": now.strftime("%H:%M:%S"),
-        "estado": "OK"
+        "fecha": now.strftime("%H:%M:%S")
     }
 }
 
@@ -307,47 +309,23 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             border-radius: 8px; padding: 6px 4px; color: #ffffff;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); cursor: pointer; user-select: none;
             display: flex; flex-direction: column; justify-content: space-between; text-align: center;
-            position: relative;
         }
         .unit-card:active { transform: scale(0.97); background: rgba(30, 41, 59, 0.95); }
 
         .unit-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 2px; }
         .unit-title { font-size: 9.5px; font-weight: 800; color: #ffffff; }
-        .unit-status { font-size: 7.5px; color: #38ef7d; font-weight: 800; background: rgba(56, 239, 125, 0.15); padding: 0.5px 4px; border-radius: 3px; border: 1px solid rgba(56, 239, 125, 0.3); margin-top: 1px; transition: all 0.2s; }
+        .unit-status { font-size: 7.5px; color: #38ef7d; font-weight: 800; background: rgba(56, 239, 125, 0.15); padding: 0.5px 4px; border-radius: 3px; border: 1px solid rgba(56, 239, 125, 0.3); margin-top: 1px; }
         .unit-status.resting { color: #94a3b8; background: rgba(148, 163, 184, 0.15); border-color: rgba(148, 163, 184, 0.3); }
-        .unit-status.out-of-service { color: #ef4444; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); }
-        {% if is_admin %}
-        .unit-status { cursor: pointer; }
-        .unit-status:hover { filter: brightness(1.2); }
-        {% endif %}
+        .unit-status.out-of-service { color: #ef4444; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); }
 
-        .status-menu {
-            display: none;
-            position: absolute;
-            top: 28px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 23, 42, 0.98);
-            border: 1px solid rgba(56, 189, 248, 0.5);
-            border-radius: 6px;
-            padding: 4px;
-            z-index: 100000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            width: 92%;
+        .unit-toggle-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #fca5a5; font-size: 7px; font-weight: 800;
+            padding: 2px 4px; border-radius: 4px; margin-top: 3px; cursor: pointer;
+            transition: all 0.2s;
         }
-        .status-menu.active { display: block; }
-        .status-option {
-            font-size: 7.5px;
-            font-weight: 800;
-            padding: 4px;
-            border-radius: 4px;
-            cursor: pointer;
-            text-align: center;
-        }
-        .status-option.off { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
-        .status-option.off:hover { background: rgba(239, 68, 68, 0.25); }
-        .status-option.on { color: #38ef7d; background: rgba(56, 239, 125, 0.1); }
-        .status-option.on:hover { background: rgba(56, 239, 125, 0.25); }
+        .unit-toggle-btn:hover { background: rgba(239, 68, 68, 0.4); }
 
         .unit-body { display: flex; flex-direction: column; gap: 1px; margin: 3px 0; }
         .unit-target { font-size: 8px; font-weight: 700; color: #f59e0b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -416,8 +394,10 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-01')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-01</span>
-                    <span class="unit-status" id="unit-status-1" onclick="toggleStatusMenu(event, 1)">ACTIVA</span>
-                    <div class="status-menu" id="status-menu-1"></div>
+                    <span class="unit-status" id="unit-status-1">ACTIVA</span>
+                    {% if code == "105544" %}
+                    <button class="unit-toggle-btn" onclick="event.stopPropagation(); toggleUnitService('Unidad-01')">⚙️ Estado</button>
+                    {% endif %}
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-1">➡️ --</div>
@@ -429,8 +409,10 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-02')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-02</span>
-                    <span class="unit-status" id="unit-status-2" onclick="toggleStatusMenu(event, 2)">ACTIVA</span>
-                    <div class="status-menu" id="status-menu-2"></div>
+                    <span class="unit-status" id="unit-status-2">ACTIVA</span>
+                    {% if code == "105544" %}
+                    <button class="unit-toggle-btn" onclick="event.stopPropagation(); toggleUnitService('Unidad-02')">⚙️ Estado</button>
+                    {% endif %}
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-2">➡️ --</div>
@@ -442,8 +424,10 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-03')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-03</span>
-                    <span class="unit-status" id="unit-status-3" onclick="toggleStatusMenu(event, 3)">ACTIVA</span>
-                    <div class="status-menu" id="status-menu-3"></div>
+                    <span class="unit-status" id="unit-status-3">ACTIVA</span>
+                    {% if code == "105544" %}
+                    <button class="unit-toggle-btn" onclick="event.stopPropagation(); toggleUnitService('Unidad-03')">⚙️ Estado</button>
+                    {% endif %}
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-3">➡️ --</div>
@@ -481,71 +465,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <div id="map"></div>
-
-    <script>
-        var isAdmin = {{ 'true' if is_admin else 'false' }};
-        var currentEmpCode = "{{ code }}";
-        var currentServerStates = { "Unidad-01": "OK", "Unidad-02": "OK", "Unidad-03": "OK" };
-
-        function toggleStatusMenu(event, idx) {
-            if (!isAdmin) return;
-            event.stopPropagation();
-            var menu = document.getElementById('status-menu-' + idx);
-            var isVisible = menu.classList.contains('active');
-            
-            for (var i = 1; i <= 3; i++) {
-                var m = document.getElementById('status-menu-' + i);
-                if (m) m.classList.remove('active');
-            }
-            
-            if (!isVisible) {
-                var unitKey = "Unidad-0" + idx;
-                var currentState = currentServerStates[unitKey];
-                
-                if (currentState === "OUT_OF_SERVICE") {
-                    menu.innerHTML = '<div class="status-option on" onclick="changeUnitStatus(event, ' + idx + ', \'OK\')">PONER EN SERVICIO</div>';
-                } else {
-                    menu.innerHTML = '<div class="status-option off" onclick="changeUnitStatus(event, ' + idx + ', \'OUT_OF_SERVICE\')">FUERA DE SERVICIO</div>';
-                }
-                menu.classList.add('active');
-            }
-        }
-
-        function changeUnitStatus(event, idx, newStatus) {
-            event.stopPropagation();
-            var unitKey = "Unidad-0" + idx;
-            
-            fetch('/api/unit-status', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    code: currentEmpCode,
-                    unit_id: unitKey,
-                    status: newStatus
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    currentServerStates[unitKey] = newStatus;
-                    updateData();
-                } else {
-                    alert(data.error || "No se pudo cambiar el estado.");
-                }
-            })
-            .catch(err => console.error(err));
-
-            var menu = document.getElementById('status-menu-' + idx);
-            if (menu) menu.classList.remove('active');
-        }
-
-        document.addEventListener('click', function() {
-            for (var i = 1; i <= 3; i++) {
-                var m = document.getElementById('status-menu-' + i);
-                if (m) m.classList.remove('active');
-            }
-        });
-    </script>
 
     {% raw %}
     <script>
@@ -606,21 +525,23 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             });
         }
 
-        function updateUnitsOperatingStatus() {
+        function updateUnitsOperatingStatus(customStatuses) {
             var isOperating = checkIsOperating();
             unitKeys.forEach(function(key, index) {
                 var idx = index + 1;
                 var el = document.getElementById('unit-status-' + idx);
                 if (el) {
-                    if (currentServerStates[key] === "OUT_OF_SERVICE") {
+                    if (customStatuses && customStatuses[key] === "FUERA DE SERVICIO") {
                         el.innerText = 'FUERA DE SERVICIO';
-                        el.className = 'unit-status out-of-service';
+                        el.classList.remove('resting');
+                        el.classList.add('out-of-service');
                     } else if (isOperating) {
                         el.innerText = 'ACTIVA';
-                        el.className = 'unit-status';
+                        el.classList.remove('resting', 'out-of-service');
                     } else {
                         el.innerText = 'EN DESCANSO';
-                        el.className = 'unit-status resting';
+                        el.classList.remove('out-of-service');
+                        el.classList.add('resting');
                     }
                 }
             });
@@ -783,26 +704,43 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             });
         }
 
+        function toggleUnitService(unitId) {
+            fetch('/api/toggle_status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emp_code: "{{ code }}", unit_id: unitId })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === 'ok') {
+                    updateData();
+                } else {
+                    alert(res.message || 'Error al cambiar estado.');
+                }
+            });
+        }
+
         function updateData() {
             fetch('/api/gps?' + new Date().getTime())
                 .then(res => res.json())
                 .then(data => {
                     if (data) {
-                        unitKeys.forEach(function(key, index) {
-                            if (data[key]) {
-                                var uData = data[key];
-                                unitsCoords[key].lat = uData.lat;
-                                unitsCoords[key].lon = uData.lng;
-                                unitsCoords[key].speed = uData.speed;
-                                if (uData.estado) {
-                                    currentServerStates[key] = uData.estado;
-                                }
+                        if (data.units_gps) {
+                            unitKeys.forEach(function(key, index) {
+                                if (data.units_gps[key]) {
+                                    var uData = data.units_gps[key];
+                                    unitsCoords[key].lat = uData.lat;
+                                    unitsCoords[key].lon = uData.lng;
+                                    unitsCoords[key].speed = uData.speed;
 
-                                unitFeatures[key].getGeometry().setCoordinates(ol.proj.fromLonLat([uData.lng, uData.lat]));
-                            }
-                        });
-                        updateUnitsOperatingStatus();
-                        updateAllEtas();
+                                    unitFeatures[key].getGeometry().setCoordinates(ol.proj.fromLonLat([uData.lng, uData.lat]));
+                                }
+                            });
+                            updateAllEtas();
+                        }
+                        if (data.units_status) {
+                            updateUnitsOperatingStatus(data.units_status);
+                        }
                     }
                 })
                 .catch(err => console.log(err));
@@ -817,10 +755,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
-@app.after_request
-def add_header(response):
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    return response
+# ----------------- RUTAS Y ENDPOINTS ----------------- #
 
 @app.route('/', methods=['GET'])
 def index():
@@ -828,69 +763,43 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    error = None
     if request.method == 'POST':
         code = request.form.get('emp_code', '').strip()
         if code in EMPLEADOS_DB:
-            return redirect(url_for('welcome', code=code))
+            return render_template_string(WELCOME_TEMPLATE, emp=EMPLEADOS_DB[code], code=code)
         else:
-            error = "Código de empleado no autorizado o incorrecto."
-    return render_template_string(LOGIN_TEMPLATE, error=error)
+            return render_template_string(LOGIN_TEMPLATE, error="Código de empleado no registrado.")
+    return render_template_string(LOGIN_TEMPLATE, error=None)
 
-@app.route('/welcome/<code>', methods=['GET'])
-def welcome(code):
-    if code not in EMPLEADOS_DB:
-        return redirect(url_for('login'))
-    emp = EMPLEADOS_DB[code]
-    return render_template_string(WELCOME_TEMPLATE, emp=emp, code=code)
-
-@app.route('/map/<code>', methods=['GET'])
+@app.route('/map/<code>')
 def map_view(code):
     if code not in EMPLEADOS_DB:
         return redirect(url_for('login'))
-    
-    # Verificación directa por el código de empleado
-    is_admin = (code in ADMIN_CODES)
-    
-    return render_template_string(MAP_TEMPLATE, is_admin=is_admin, code=code)
+    return render_template_string(MAP_TEMPLATE, code=code)
 
-@app.route('/api/gps', methods=['GET'])
+@app.route('/api/gps')
 def get_gps():
-    return jsonify(gps_data)
+    return jsonify({
+        "units_gps": gps_data,
+        "units_status": UNITS_STATUS
+    })
 
-@app.route('/api/unit-status', methods=['POST'])
-def update_unit_status():
+@app.route('/api/toggle_status', methods=['POST'])
+def toggle_status():
     data = request.get_json() or {}
-    code = data.get('code', '')
-    unit_id = data.get('unit_id', '')
-    new_status = data.get('status', '')
-
-    if code not in ADMIN_CODES:
-        return jsonify({"success": False, "error": "No autorizado"}), 403
-
-    if unit_id in gps_data and new_status in ["OK", "OUT_OF_SERVICE"]:
-        gps_data[unit_id]["estado"] = new_status
-        return jsonify({"success": True, "unit_id": unit_id, "estado": new_status})
-
-    return jsonify({"success": False, "error": "Parámetros inválidos"}), 400
-
-@app.route('/traccar', methods=['GET', 'POST'])
-def traccar_receiver():
-    lat = request.args.get('lat') or request.form.get('lat')
-    lng = request.args.get('lon') or request.args.get('lng') or request.form.get('lon') or request.form.get('lng')
-    speed = request.args.get('speed', 0)
-
-    if lat and lng:
-        try:
-            gps_data["Unidad-01"]["lat"] = float(lat)
-            gps_data["Unidad-01"]["lng"] = float(lng)
-            gps_data["Unidad-01"]["speed"] = float(speed)
-            gps_data["Unidad-01"]["fecha"] = datetime.datetime.now(tz_caracas).strftime("%H:%M:%S")
-            print(f"--> [TRACCAR RECEPTOR] U-01 actualizada: Lat {lat}, Lng {lng}")
-            return "OK", 200
-        except Exception as e:
-            return f"Error: {str(e)}", 400
-    return "Receptor GPS Traccar Activo", 200
+    code = data.get('emp_code')
+    unit_id = data.get('unit_id')
+    
+    if code == "105544":
+        if unit_id in UNITS_STATUS:
+            if UNITS_STATUS[unit_id] == "FUERA DE SERVICIO":
+                UNITS_STATUS[unit_id] = "AUTO"
+            else:
+                UNITS_STATUS[unit_id] = "FUERA DE SERVICIO"
+            return jsonify({"status": "ok", "new_status": UNITS_STATUS[unit_id]})
+        return jsonify({"status": "error", "message": "Unidad no encontrada."}), 400
+    
+    return jsonify({"status": "error", "message": "No autorizado."}), 403
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

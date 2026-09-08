@@ -5,6 +5,9 @@ from flask import Flask, jsonify, request, render_template_string, redirect, url
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 
+# Lista de códigos de empleados que tienen privilegios de administrador
+ADMIN_CODES = {"105544"}
+
 EMPLEADOS_DB = {
     "105544": {
         "nombre": "Carlos Serrano",
@@ -301,13 +304,45 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             border-radius: 8px; padding: 6px 4px; color: #ffffff;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); cursor: pointer; user-select: none;
             display: flex; flex-direction: column; justify-content: space-between; text-align: center;
+            position: relative;
         }
         .unit-card:active { transform: scale(0.97); background: rgba(30, 41, 59, 0.95); }
 
         .unit-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 2px; }
         .unit-title { font-size: 9.5px; font-weight: 800; color: #ffffff; }
-        .unit-status { font-size: 7.5px; color: #38ef7d; font-weight: 800; background: rgba(56, 239, 125, 0.15); padding: 0.5px 4px; border-radius: 3px; border: 1px solid rgba(56, 239, 125, 0.3); margin-top: 1px; }
+        .unit-status { font-size: 7.5px; color: #38ef7d; font-weight: 800; background: rgba(56, 239, 125, 0.15); padding: 0.5px 4px; border-radius: 3px; border: 1px solid rgba(56, 239, 125, 0.3); margin-top: 1px; transition: all 0.2s; }
         .unit-status.resting { color: #94a3b8; background: rgba(148, 163, 184, 0.15); border-color: rgba(148, 163, 184, 0.3); }
+        .unit-status.out-of-service { color: #ef4444; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); }
+        {% if is_admin %}
+        .unit-status { cursor: pointer; }
+        .unit-status:hover { filter: brightness(1.2); }
+        {% endif %}
+
+        .status-menu {
+            display: none;
+            position: absolute;
+            top: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.98);
+            border: 1px solid rgba(239, 68, 68, 0.6);
+            border-radius: 6px;
+            padding: 4px;
+            z-index: 100000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            width: 90%;
+        }
+        .status-menu.active { display: block; }
+        .status-option {
+            font-size: 7.5px;
+            font-weight: 800;
+            color: #ef4444;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            background: rgba(239, 68, 68, 0.1);
+        }
+        .status-option:hover { background: rgba(239, 68, 68, 0.25); }
 
         .unit-body { display: flex; flex-direction: column; gap: 1px; margin: 3px 0; }
         .unit-target { font-size: 8px; font-weight: 700; color: #f59e0b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -376,7 +411,10 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-01')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-01</span>
-                    <span class="unit-status" id="unit-status-1">ACTIVA</span>
+                    <span class="unit-status" id="unit-status-1" onclick="toggleStatusMenu(event, 1)">ACTIVA</span>
+                    <div class="status-menu" id="status-menu-1">
+                        <div class="status-option" onclick="setOutOfService(event, 1)">FUERA DE SERVICIO</div>
+                    </div>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-1">➡️ --</div>
@@ -388,7 +426,10 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-02')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-02</span>
-                    <span class="unit-status" id="unit-status-2">ACTIVA</span>
+                    <span class="unit-status" id="unit-status-2" onclick="toggleStatusMenu(event, 2)">ACTIVA</span>
+                    <div class="status-menu" id="status-menu-2">
+                        <div class="status-option" onclick="setOutOfService(event, 2)">FUERA DE SERVICIO</div>
+                    </div>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-2">➡️ --</div>
@@ -400,7 +441,10 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             <div class="unit-card" onclick="centerOnUnit('Unidad-03')">
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-03</span>
-                    <span class="unit-status" id="unit-status-3">ACTIVA</span>
+                    <span class="unit-status" id="unit-status-3" onclick="toggleStatusMenu(event, 3)">ACTIVA</span>
+                    <div class="status-menu" id="status-menu-3">
+                        <div class="status-option" onclick="setOutOfService(event, 3)">FUERA DE SERVICIO</div>
+                    </div>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-3">➡️ --</div>
@@ -438,6 +482,45 @@ MAP_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <div id="map"></div>
+
+    <script>
+        var isAdmin = {{ 'true' if is_admin else 'false' }};
+        var outOfServiceUnits = { 1: false, 2: false, 3: false };
+
+        function toggleStatusMenu(event, idx) {
+            if (!isAdmin) return;
+            event.stopPropagation();
+            var menu = document.getElementById('status-menu-' + idx);
+            var isVisible = menu.classList.contains('active');
+            
+            for (var i = 1; i <= 3; i++) {
+                var m = document.getElementById('status-menu-' + i);
+                if (m) m.classList.remove('active');
+            }
+            if (!isVisible) {
+                menu.classList.add('active');
+            }
+        }
+
+        function setOutOfService(event, idx) {
+            event.stopPropagation();
+            outOfServiceUnits[idx] = true;
+            var el = document.getElementById('unit-status-' + idx);
+            if (el) {
+                el.innerText = 'FUERA DE SERVICIO';
+                el.className = 'unit-status out-of-service';
+            }
+            var menu = document.getElementById('status-menu-' + idx);
+            if (menu) menu.classList.remove('active');
+        }
+
+        document.addEventListener('click', function() {
+            for (var i = 1; i <= 3; i++) {
+                var m = document.getElementById('status-menu-' + i);
+                if (m) m.classList.remove('active');
+            }
+        });
+    </script>
 
     {% raw %}
     <script>
@@ -502,14 +585,17 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             var isOperating = checkIsOperating();
             unitKeys.forEach(function(key, index) {
                 var idx = index + 1;
+                if (outOfServiceUnits && outOfServiceUnits[idx]) {
+                    return;
+                }
                 var el = document.getElementById('unit-status-' + idx);
                 if (el) {
                     if (isOperating) {
                         el.innerText = 'ACTIVA';
-                        el.classList.remove('resting');
+                        el.className = 'unit-status';
                     } else {
                         el.innerText = 'EN DESCANSO';
-                        el.classList.add('resting');
+                        el.className = 'unit-status resting';
                     }
                 }
             });
@@ -734,7 +820,11 @@ def welcome(code):
 def map_view(code):
     if code not in EMPLEADOS_DB:
         return redirect(url_for('login'))
-    return render_template_string(MAP_TEMPLATE)
+    
+    # Verificación directa por el código de empleado
+    is_admin = (code in ADMIN_CODES)
+    
+    return render_template_string(MAP_TEMPLATE, is_admin=is_admin)
 
 @app.route('/api/gps', methods=['GET'])
 def get_gps():

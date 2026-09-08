@@ -539,28 +539,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             });
         }
 
-        function updateUnitsOperatingStatus(customStatuses) {
-            var isOperating = checkIsOperating();
-            unitKeys.forEach(function(key, index) {
-                var idx = index + 1;
-                var el = document.getElementById('unit-status-' + idx);
-                if (el) {
-                    if (customStatuses && customStatuses[key] === "FUERA DE SERVICIO") {
-                        el.innerText = 'FUERA DE SERVICIO';
-                        el.classList.remove('resting');
-                        el.classList.add('out-of-service');
-                    } else if (isOperating) {
-                        el.innerText = 'ACTIVA';
-                        el.classList.remove('resting', 'out-of-service');
-                    } else {
-                        el.innerText = 'EN DESCANSO';
-                        el.classList.remove('out-of-service');
-                        el.classList.add('resting');
-                    }
-                }
-            });
-        }
-
         var vanSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="26" height="26">
                 <ellipse cx="32" cy="54" rx="26" ry="6" fill="rgba(0,0,0,0.3)"/>
@@ -574,6 +552,44 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 <circle cx="46" cy="46" r="6" fill="#0F172A" stroke="#FFFFFF" stroke-width="1.5"/>
             </svg>
         `);
+
+        var vanStyle = new ol.style.Style({
+            image: new ol.style.Icon({ anchor: [0.5, 0.5], src: vanSvg, scale: 1.0 })
+        });
+
+        function updateUnitsOperatingStatus(customStatuses) {
+            var isOperating = checkIsOperating();
+            unitKeys.forEach(function(key, index) {
+                var idx = index + 1;
+                var el = document.getElementById('unit-status-' + idx);
+                var isActive = false;
+
+                if (el) {
+                    if (customStatuses && customStatuses[key] === "FUERA DE SERVICIO") {
+                        el.innerText = 'FUERA DE SERVICIO';
+                        el.classList.remove('resting');
+                        el.classList.add('out-of-service');
+                    } else if (isOperating) {
+                        el.innerText = 'ACTIVA';
+                        el.classList.remove('resting', 'out-of-service');
+                        isActive = true;
+                    } else {
+                        el.innerText = 'EN DESCANSO';
+                        el.classList.remove('out-of-service');
+                        el.classList.add('resting');
+                    }
+                }
+
+                // Ocultar icono en mapa si está fuera de servicio o en descanso
+                if (unitFeatures[key]) {
+                    if (isActive) {
+                        unitFeatures[key].setStyle(vanStyle);
+                    } else {
+                        unitFeatures[key].setStyle(null);
+                    }
+                }
+            });
+        }
 
         function createStopSvg(badgeText) {
             return 'data:image/svg+xml;utf8,' + encodeURIComponent(`
@@ -594,9 +610,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 unitId: key,
                 isUnit: true
             });
-            f.setStyle(new ol.style.Style({
-                image: new ol.style.Icon({ anchor: [0.5, 0.5], src: vanSvg, scale: 1.0 })
-            }));
+            f.setStyle(vanStyle);
             unitFeatures[key] = f;
         });
 

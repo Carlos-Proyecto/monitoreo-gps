@@ -466,6 +466,24 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 
     <div id="map"></div>
 
+    <script>
+        function toggleUnitService(unitId) {
+            fetch('/api/toggle_status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emp_code: "{{ code }}", unit_id: unitId })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === 'ok') {
+                    updateData();
+                } else {
+                    alert(res.message || 'Error al cambiar estado.');
+                }
+            });
+        }
+    </script>
+
     {% raw %}
     <script>
         var inactivityTimer;
@@ -700,22 +718,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                         var timeMinutes = Math.round(((minDistance / 1000) / effectiveSpeed) * 60);
                         document.getElementById('next-stop-eta-' + idx).innerText = '⏱️ ' + (timeMinutes <= 1 ? '<1 min' : '~' + timeMinutes + 'm');
                     }
-                }
-            });
-        }
-
-        function toggleUnitService(unitId) {
-            fetch('/api/toggle_status', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ emp_code: "{{ code }}", unit_id: unitId })
-            })
-            .then(res => res.json())
-            .then(res => {
-                if(res.status === 'ok') {
-                    updateData();
-                } else {
-                    alert(res.message || 'Error al cambiar estado.');
                 }
             });
         }

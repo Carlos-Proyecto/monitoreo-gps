@@ -29,19 +29,22 @@ gps_data = {
         "lat": 10.4765223,
         "lng": -66.8326641,
         "speed": 0,
-        "fecha": now.strftime("%H:%M:%S")
+        "fecha": now.strftime("%H:%M:%S"),
+        "estado": "OK"
     },
     "Unidad-02": {
         "lat": 10.4782000,
         "lng": -66.8341000,
         "speed": 0,
-        "fecha": now.strftime("%H:%M:%S")
+        "fecha": now.strftime("%H:%M:%S"),
+        "estado": "OK"
     },
     "Unidad-03": {
         "lat": 10.4751000,
         "lng": -66.8309000,
         "speed": 0,
-        "fecha": now.strftime("%H:%M:%S")
+        "fecha": now.strftime("%H:%M:%S"),
+        "estado": "OK"
     }
 }
 
@@ -325,24 +328,26 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             left: 50%;
             transform: translateX(-50%);
             background: rgba(15, 23, 42, 0.98);
-            border: 1px solid rgba(239, 68, 68, 0.6);
+            border: 1px solid rgba(56, 189, 248, 0.5);
             border-radius: 6px;
             padding: 4px;
             z-index: 100000;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            width: 90%;
+            width: 92%;
         }
         .status-menu.active { display: block; }
         .status-option {
             font-size: 7.5px;
             font-weight: 800;
-            color: #ef4444;
             padding: 4px;
             border-radius: 4px;
             cursor: pointer;
-            background: rgba(239, 68, 68, 0.1);
+            text-align: center;
         }
-        .status-option:hover { background: rgba(239, 68, 68, 0.25); }
+        .status-option.off { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .status-option.off:hover { background: rgba(239, 68, 68, 0.25); }
+        .status-option.on { color: #38ef7d; background: rgba(56, 239, 125, 0.1); }
+        .status-option.on:hover { background: rgba(56, 239, 125, 0.25); }
 
         .unit-body { display: flex; flex-direction: column; gap: 1px; margin: 3px 0; }
         .unit-target { font-size: 8px; font-weight: 700; color: #f59e0b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -412,9 +417,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-01</span>
                     <span class="unit-status" id="unit-status-1" onclick="toggleStatusMenu(event, 1)">ACTIVA</span>
-                    <div class="status-menu" id="status-menu-1">
-                        <div class="status-option" onclick="setOutOfService(event, 1)">FUERA DE SERVICIO</div>
-                    </div>
+                    <div class="status-menu" id="status-menu-1"></div>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-1">➡️ --</div>
@@ -427,9 +430,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-02</span>
                     <span class="unit-status" id="unit-status-2" onclick="toggleStatusMenu(event, 2)">ACTIVA</span>
-                    <div class="status-menu" id="status-menu-2">
-                        <div class="status-option" onclick="setOutOfService(event, 2)">FUERA DE SERVICIO</div>
-                    </div>
+                    <div class="status-menu" id="status-menu-2"></div>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-2">➡️ --</div>
@@ -442,9 +443,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-03</span>
                     <span class="unit-status" id="unit-status-3" onclick="toggleStatusMenu(event, 3)">ACTIVA</span>
-                    <div class="status-menu" id="status-menu-3">
-                        <div class="status-option" onclick="setOutOfService(event, 3)">FUERA DE SERVICIO</div>
-                    </div>
+                    <div class="status-menu" id="status-menu-3"></div>
                 </div>
                 <div class="unit-body">
                     <div class="unit-target" id="next-stop-name-3">➡️ --</div>
@@ -485,7 +484,8 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 
     <script>
         var isAdmin = {{ 'true' if is_admin else 'false' }};
-        var outOfServiceUnits = { 1: false, 2: false, 3: false };
+        var currentEmpCode = "{{ code }}";
+        var currentServerStates = { "Unidad-01": "OK", "Unidad-02": "OK", "Unidad-03": "OK" };
 
         function toggleStatusMenu(event, idx) {
             if (!isAdmin) return;
@@ -497,19 +497,44 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 var m = document.getElementById('status-menu-' + i);
                 if (m) m.classList.remove('active');
             }
+            
             if (!isVisible) {
+                var unitKey = "Unidad-0" + idx;
+                var currentState = currentServerStates[unitKey];
+                
+                if (currentState === "OUT_OF_SERVICE") {
+                    menu.innerHTML = '<div class="status-option on" onclick="changeUnitStatus(event, ' + idx + ', \'OK\')">PONER EN SERVICIO</div>';
+                } else {
+                    menu.innerHTML = '<div class="status-option off" onclick="changeUnitStatus(event, ' + idx + ', \'OUT_OF_SERVICE\')">FUERA DE SERVICIO</div>';
+                }
                 menu.classList.add('active');
             }
         }
 
-        function setOutOfService(event, idx) {
+        function changeUnitStatus(event, idx, newStatus) {
             event.stopPropagation();
-            outOfServiceUnits[idx] = true;
-            var el = document.getElementById('unit-status-' + idx);
-            if (el) {
-                el.innerText = 'FUERA DE SERVICIO';
-                el.className = 'unit-status out-of-service';
-            }
+            var unitKey = "Unidad-0" + idx;
+            
+            fetch('/api/unit-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: currentEmpCode,
+                    unit_id: unitKey,
+                    status: newStatus
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    currentServerStates[unitKey] = newStatus;
+                    updateData();
+                } else {
+                    alert(data.error || "No se pudo cambiar el estado.");
+                }
+            })
+            .catch(err => console.error(err));
+
             var menu = document.getElementById('status-menu-' + idx);
             if (menu) menu.classList.remove('active');
         }
@@ -585,12 +610,12 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             var isOperating = checkIsOperating();
             unitKeys.forEach(function(key, index) {
                 var idx = index + 1;
-                if (outOfServiceUnits && outOfServiceUnits[idx]) {
-                    return;
-                }
                 var el = document.getElementById('unit-status-' + idx);
                 if (el) {
-                    if (isOperating) {
+                    if (currentServerStates[key] === "OUT_OF_SERVICE") {
+                        el.innerText = 'FUERA DE SERVICIO';
+                        el.className = 'unit-status out-of-service';
+                    } else if (isOperating) {
                         el.innerText = 'ACTIVA';
                         el.className = 'unit-status';
                     } else {
@@ -759,7 +784,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         }
 
         function updateData() {
-            updateUnitsOperatingStatus();
             fetch('/api/gps?' + new Date().getTime())
                 .then(res => res.json())
                 .then(data => {
@@ -770,10 +794,14 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                                 unitsCoords[key].lat = uData.lat;
                                 unitsCoords[key].lon = uData.lng;
                                 unitsCoords[key].speed = uData.speed;
+                                if (uData.estado) {
+                                    currentServerStates[key] = uData.estado;
+                                }
 
                                 unitFeatures[key].getGeometry().setCoordinates(ol.proj.fromLonLat([uData.lng, uData.lat]));
                             }
                         });
+                        updateUnitsOperatingStatus();
                         updateAllEtas();
                     }
                 })
@@ -824,11 +852,27 @@ def map_view(code):
     # Verificación directa por el código de empleado
     is_admin = (code in ADMIN_CODES)
     
-    return render_template_string(MAP_TEMPLATE, is_admin=is_admin)
+    return render_template_string(MAP_TEMPLATE, is_admin=is_admin, code=code)
 
 @app.route('/api/gps', methods=['GET'])
 def get_gps():
     return jsonify(gps_data)
+
+@app.route('/api/unit-status', methods=['POST'])
+def update_unit_status():
+    data = request.get_json() or {}
+    code = data.get('code', '')
+    unit_id = data.get('unit_id', '')
+    new_status = data.get('status', '')
+
+    if code not in ADMIN_CODES:
+        return jsonify({"success": False, "error": "No autorizado"}), 403
+
+    if unit_id in gps_data and new_status in ["OK", "OUT_OF_SERVICE"]:
+        gps_data[unit_id]["estado"] = new_status
+        return jsonify({"success": True, "unit_id": unit_id, "estado": new_status})
+
+    return jsonify({"success": False, "error": "Parámetros inválidos"}), 400
 
 @app.route('/traccar', methods=['GET', 'POST'])
 def traccar_receiver():

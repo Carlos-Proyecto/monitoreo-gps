@@ -290,7 +290,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             display: inline-flex; align-items: center; cursor: pointer; transition: all 0.2s;
         }
         .schedule-btn { border: 1px solid rgba(168, 85, 247, 0.5); color: #c084fc; }
-        .incident-btn { border: 1px solid rgba(239, 68, 68, 0.5); color: #ef4444; }
+        .rules-btn { border: 1px solid rgba(245, 158, 11, 0.5); color: #f59e0b; }
         .survey-btn { border: 1px solid rgba(56, 189, 248, 0.5); color: #38bdf8; }
 
         .units-row {
@@ -340,18 +340,36 @@ MAP_TEMPLATE = """<!DOCTYPE html>
             background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(168, 85, 247, 0.4);
             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); border-radius: 14px; padding: 16px; width: 90%; max-width: 340px;
             color: #ffffff; text-align: center; transform: scale(0.9); transition: transform 0.3s ease;
+            max-height: 85vh; display: flex; flex-direction: column;
         }
         .modal-overlay.active .modal-box { transform: scale(1); }
 
+        .modal-box.rules-box {
+            border-color: rgba(245, 158, 11, 0.4);
+            max-width: 380px;
+        }
+
         .modal-title { font-size: 14px; font-weight: 800; color: #c084fc; margin-bottom: 10px; }
+        .modal-title.rules-title { color: #f59e0b; }
+        
         .schedule-group { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 8px; margin-bottom: 8px; text-align: center; }
         .schedule-header { font-weight: 800; font-size: 10.5px; color: #38bdf8; margin-bottom: 4px; text-transform: uppercase; }
         .schedule-list { list-style: none; font-size: 10px; color: #cbd5e1; font-weight: 600; line-height: 1.4; }
 
+        .rules-content {
+            overflow-y: auto; text-align: left; padding-right: 5px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .rules-item { background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
+        .rules-item-title { font-size: 10.5px; font-weight: 800; color: #38bdf8; margin-bottom: 3px; }
+        .rules-item-text { font-size: 9.5px; color: #cbd5e1; line-height: 1.35; font-weight: 500; }
+
         .modal-close-btn {
-            margin-top: 2px; width: 100%; padding: 8px; border: none; border-radius: 8px;
+            margin-top: auto; width: 100%; padding: 8px; border: none; border-radius: 8px;
             background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5);
             color: #c084fc; font-size: 11px; font-weight: 800; cursor: pointer;
+        }
+        .modal-close-btn.rules-close-btn {
+            background: rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.5); color: #f59e0b;
         }
     </style>
 </head>
@@ -377,7 +395,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
     <div class="bottom-controls">
         <div class="action-bar">
             <button onclick="toggleModal(true)" class="action-btn schedule-btn">🕒 Horarios</button>
-            <a href="#" id="incident-link" target="_blank" class="action-btn incident-btn">🚨 Incidente</a>
+            <button onclick="toggleRulesModal(true)" class="action-btn rules-btn">📋 Normas</button>
             <a href="https://forms.gle/MERriZ2iw7zrfcY27" 
                id="survey-link" 
                target="_blank" 
@@ -459,6 +477,49 @@ MAP_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
 
+    <div class="modal-overlay" id="rulesModal" onclick="toggleRulesModal(false)">
+        <div class="modal-box rules-box" onclick="event.stopPropagation()">
+            <div class="modal-title rules-title">📋 Normas de Uso del Servicio de Transporte Corporativo</div>
+            
+            <div class="rules-content">
+                <div class="rules-item">
+                    <div class="rules-item-title">📌 Puntos de Abordaje</div>
+                    <div class="rules-item-text">Hasta las 08:00 a.m., la parada oficial estará ubicada en Gama Express. Posterior a este horario, el punto de abordaje se trasladará al frente de la estación del metro Los Cortijos.</div>
+                </div>
+                <div class="rules-item">
+                    <div class="rules-item-title">🛡️ Zona de Espera en PCM</div>
+                    <div class="rules-item-text">Por razones de seguridad y para el resguardo de la integridad física del personal, el área de espera asignada para el transporte en PCM será exclusivamente en las escaleras de la rampa de acceso a proveedores.</div>
+                </div>
+                <div class="rules-item">
+                    <div class="rules-item-title">⏱️ Tiempos de Espera</div>
+                    <div class="rules-item-text">Antes de las 08:00 a.m., las unidades operarán con un tiempo de parada mínimo para agilizar el flujo. A partir de esa hora, el tiempo máximo de espera establecido será de diez (10) minutos por unidad.</div>
+                </div>
+                <div class="rules-item">
+                    <div class="rules-item-title">🚫 Capacidad Ocupacional y Seguridad Vial</div>
+                    <div class="rules-item-text">Por motivos de seguridad operacional, las unidades no deberán exceder su capacidad máxima de pasajeros. Queda estrictamente prohibido viajar de pie, sentados en el pasillo o sobre la tapa del motor.</div>
+                </div>
+                <div class="rules-item">
+                    <div class="rules-item-title">🪪 Control de Acceso e Identificación</div>
+                    <div class="rules-item-text">El servicio es de uso exclusivo para el personal. Es obligatorio portar y presentar el carnet corporativo al controlador de turno para su verificación. Queda prohibido el ingreso de personal ajeno a la organización; cualquier excepción deberá ser previamente autorizada por el Departamento de Seguridad.</div>
+                </div>
+                <div class="rules-item">
+                    <div class="rules-item-title">🚏 Paradas Autorizadas</div>
+                    <div class="rules-item-text">El embarque y desembarque de pasajeros se realizará únicamente en los puntos designados por la Gerencia de Seguridad. Se prohíbe realizar paradas no contempladas sin la debida autorización de dicho departamento.</div>
+                </div>
+                <div class="rules-item">
+                    <div class="rules-item-title">🕒 Horarios de Operación</div>
+                    <div class="rules-item-text">Las unidades prestarán servicio estrictamente dentro de los horarios estipulados, sin realizar traslados fuera de la programación oficial.</div>
+                </div>
+                <div class="rules-item">
+                    <div class="rules-item-title">👔 Conducta y Presentación</div>
+                    <div class="rules-item-text">Queda restringido el consumo de alimentos y bebidas dentro de las unidades. Asimismo, los usuarios deben mantener una vestimenta acorde con el código de presentación personal de la empresa.</div>
+                </div>
+            </div>
+
+            <button class="modal-close-btn rules-close-btn" onclick="toggleRulesModal(false)">Cerrar</button>
+        </div>
+    </div>
+
     <div id="map"></div>
 
     <script>
@@ -510,6 +571,12 @@ MAP_TEMPLATE = """<!DOCTYPE html>
 
         function toggleModal(show) {
             var modal = document.getElementById('scheduleModal');
+            if (show) modal.classList.add('active');
+            else modal.classList.remove('active');
+        }
+
+        function toggleRulesModal(show) {
+            var modal = document.getElementById('rulesModal');
             if (show) modal.classList.add('active');
             else modal.classList.remove('active');
         }

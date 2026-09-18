@@ -18,35 +18,44 @@ def obtener_empleado(code):
         return None
     
     try:
-        # Leer el Excel asegurando que la columna 'codigo' se interprete como texto
-        df = pd.read_excel(EXCEL_FILE, dtype={'codigo': str})
+        # Leer el archivo Excel completo
+        df = pd.read_excel(EXCEL_FILE, dtype=str)
         
-        # Limpiar espacios en blanco en los nombres de columnas y valores
-        df.columns = df.columns.str.strip()
-        df['codigo'] = df['codigo'].astype(str).str.strip()
+        # Normalizar encabezados (quitar espacios y pasar a minúsculas)
+        df.columns = df.columns.astype(str).str.strip().str.lower()
+        
+        # Buscar columna que corresponda a 'codigo'
+        col_codigo = next((col for col in df.columns if 'codigo' in col or 'código' in col), 'codigo')
+        
+        if col_codigo not in df.columns:
+            print(f"Error: No se encontró la columna 'codigo' en {EXCEL_FILE}. Columnas halladas: {df.columns.tolist()}")
+            return None
+            
+        # Limpiar la columna de códigos
+        df[col_codigo] = df[col_codigo].fillna('').astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
         
         # Buscar la fila correspondiente al código ingresado
-        match = df[df['codigo'] == str(code).strip()]
+        search_code = str(code).strip()
+        match = df[df[col_codigo] == search_code]
         
         if not match.empty:
             row = match.iloc[0]
             
-            # Verificar si es admin (soporta TRUE, True, 'TRUE', 1)
+            # Verificar si es admin (soporta TRUE, True, 'TRUE', 1, 'SI')
             es_admin_val = str(row.get('es_admin', '')).strip().upper()
-            es_admin = es_admin_val in ['TRUE', '1', 'VERDADERO']
+            es_admin = es_admin_val in ['TRUE', '1', 'VERDADERO', 'SI', 'SÍ']
             
             return {
-                "codigo": str(row['codigo']),
-                "nombre": str(row['nombre']),
-                "cargo": str(row['cargo']),
-                "gerencia": str(row['gerencia']),
+                "codigo": str(row.get(col_codigo, '')),
+                "nombre": str(row.get('nombre', 'Usuario')),
+                "cargo": str(row.get('cargo', 'Empleado')),
+                "gerencia": str(row.get('gerencia', 'General')),
                 "es_admin": es_admin
             }
     except Exception as e:
         print(f"Error leyendo el archivo Excel: {e}")
         
     return None
-
 
 UNITS_STATUS = {
     "Unidad-01": "AUTO",

@@ -1,22 +1,52 @@
 # -*- coding: utf-8 -*-
 import os
 import datetime
+import pandas as pd
 from flask import Flask, jsonify, request, render_template_string, redirect, url_for
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 
-EMPLEADOS_DB = {
-    "105544": {
-        "nombre": "Carlos Serrano",
-        "cargo": "Coordinador de Operaciones de Seguridad",
-        "gerencia": "Gerencia de Seguridad Integral"
-    },
-    "123456": {
-        "nombre": "Usuario de Prueba",
-        "cargo": "Operador de Monitoreo",
-        "gerencia": "Gerencia de Seguridad Integral"
-    }
-}
+EXCEL_FILE = "Base de datos - acceso transporte.xlsx"
+
+def obtener_empleado(code):
+    """
+    Lee el archivo Excel del proyecto y busca el empleado por su código.
+    Retorna un diccionario con los datos del empleado y si es admin, o None si no existe.
+    """
+    if not os.path.exists(EXCEL_FILE):
+        print(f"Error: No se encontró el archivo {EXCEL_FILE}")
+        return None
+    
+    try:
+        # Leer el Excel asegurando que la columna 'codigo' se interprete como texto
+        df = pd.read_excel(EXCEL_FILE, dtype={'codigo': str})
+        
+        # Limpiar espacios en blanco en los nombres de columnas y valores
+        df.columns = df.columns.str.strip()
+        df['codigo'] = df['codigo'].astype(str).str.strip()
+        
+        # Buscar la fila correspondiente al código ingresado
+        match = df[df['codigo'] == str(code).strip()]
+        
+        if not match.empty:
+            row = match.iloc[0]
+            
+            # Verificar si es admin (soporta TRUE, True, 'TRUE', 1)
+            es_admin_val = str(row.get('es_admin', '')).strip().upper()
+            es_admin = es_admin_val in ['TRUE', '1', 'VERDADERO']
+            
+            return {
+                "codigo": str(row['codigo']),
+                "nombre": str(row['nombre']),
+                "cargo": str(row['cargo']),
+                "gerencia": str(row['gerencia']),
+                "es_admin": es_admin
+            }
+    except Exception as e:
+        print(f"Error leyendo el archivo Excel: {e}")
+        
+    return None
+
 
 UNITS_STATUS = {
     "Unidad-01": "AUTO",
@@ -408,7 +438,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-01</span>
                     <span class="unit-status" id="unit-status-1">ACTIVA</span>
-                    {% if code == "105544" %}
+                    {% if es_admin %}
                     <button class="unit-toggle-btn" onclick="event.stopPropagation(); toggleUnitService('Unidad-01')">⚙️ Estado</button>
                     {% endif %}
                 </div>
@@ -423,7 +453,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-02</span>
                     <span class="unit-status" id="unit-status-2">ACTIVA</span>
-                    {% if code == "105544" %}
+                    {% if es_admin %}
                     <button class="unit-toggle-btn" onclick="event.stopPropagation(); toggleUnitService('Unidad-02')">⚙️ Estado</button>
                     {% endif %}
                 </div>
@@ -438,7 +468,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 <div class="unit-header">
                     <span class="unit-title">🚐 U-03</span>
                     <span class="unit-status" id="unit-status-3">ACTIVA</span>
-                    {% if code == "105544" %}
+                    {% if es_admin %}
                     <button class="unit-toggle-btn" onclick="event.stopPropagation(); toggleUnitService('Unidad-03')">⚙️ Estado</button>
                     {% endif %}
                 </div>
@@ -496,7 +526,7 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                 </div>
                 <div class="rules-item">
                     <div class="rules-item-title">🚫 Capacidad Ocupacional y Seguridad Vial</div>
-                    <div class="rules-item-text">Por motivos de seguridad operacional, las unidades no deberán exceder su capacidad máxima de pasajeros. Queda estrictamente prohibido viajar de pie, sentados en el pasillo o sobre la tapa del motor.</div>
+                    <div class="rules-item-text">Por motivos de seguridad operacional, las unidades no deberán exceder su capacidad máxima de pasajeros. Queda strictly prohibido viajar de pie, sentados en el pasillo o sobre la tapa del motor.</div>
                 </div>
                 <div class="rules-item">
                     <div class="rules-item-title">🪪 Control de Acceso e Identificación</div>
@@ -647,7 +677,6 @@ MAP_TEMPLATE = """<!DOCTYPE html>
                     }
                 }
 
-                // Ocultar icono en mapa si está fuera de servicio o en descanso
                 if (unitFeatures[key]) {
                     if (isActive) {
                         unitFeatures[key].setStyle(vanStyle);
@@ -879,24 +908,26 @@ def index():
 def login():
     if request.method == 'POST':
         code = request.form.get('emp_code', '').strip()
-        if code in EMPLEADOS_DB:
-            return render_template_string(WELCOME_TEMPLATE, emp=EMPLEADOS_DB[code], code=code)
+        emp = obtener_empleado(code)
+        if emp:
+            return render_template_string(WELCOME_TEMPLATE, emp=emp, code=code)
         else:
             return render_template_string(LOGIN_TEMPLATE, error="Código de empleado no autorizado o incorrecto.")
     return render_template_string(LOGIN_TEMPLATE, error=None)
 
 @app.route('/welcome/<code>', methods=['GET'])
 def welcome(code):
-    if code not in EMPLEADOS_DB:
+    emp = obtener_empleado(code)
+    if not emp:
         return redirect(url_for('login'))
-    emp = EMPLEADOS_DB[code]
     return render_template_string(WELCOME_TEMPLATE, emp=emp, code=code)
 
 @app.route('/map/<code>', methods=['GET'])
 def map_view(code):
-    if code not in EMPLEADOS_DB:
+    emp = obtener_empleado(code)
+    if not emp:
         return redirect(url_for('login'))
-    return render_template_string(MAP_TEMPLATE, code=code)
+    return render_template_string(MAP_TEMPLATE, code=code, es_admin=emp.get('es_admin', False))
 
 @app.route('/api/gps', methods=['GET'])
 def get_gps():
@@ -911,7 +942,9 @@ def toggle_status():
     code = data.get('emp_code')
     unit_id = data.get('unit_id')
     
-    if code == "105544":
+    emp = obtener_empleado(code)
+    
+    if emp and emp.get('es_admin', False):
         if unit_id in UNITS_STATUS:
             if UNITS_STATUS[unit_id] == "FUERA DE SERVICIO":
                 UNITS_STATUS[unit_id] = "AUTO"
